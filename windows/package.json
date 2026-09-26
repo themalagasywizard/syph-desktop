@@ -1,0 +1,78 @@
+{
+  "name": "syph-windows",
+  "productName": "Syph",
+  "version": "1.0.0",
+  "description": "Syph for Windows \u2014 your AI team on your PC.",
+  "author": "Syph Software",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "node scripts/build-main.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev:web": "vite",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win portable --x64",
+    "shots": "node scripts/screenshots.mjs"
+  },
+  "build": {
+    "appId": "com.syph.desktop",
+    "productName": "Syph",
+    "copyright": "\u00a9 2026 Syph Software",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "package.json",
+      "resources/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/ps",
+        "to": "ps"
+      }
+    ],
+    "afterPack": "scripts/after-pack.cjs",
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "Syph-${version}-portable.exe"
+    },
+    "nsis": {
+      "artifactName": "Syph-${version}-setup.exe",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "shortcutName": "Syph"
+    }
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "lucide-react": "^1.48.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.63.0",
+    "resedit": "^3.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

@@ -1,0 +1,167 @@
+@import '@fontsource-variable/inter';
+
+/* Tokens mirror Syph for Mac (Core/Design/Theme.swift). */
+:root {
+  --void: #050507;
+  --void-raised: #0a0b0f;
+  --panel: #0e1015;
+  --panel-high: #141720;
+  --field: rgba(255, 255, 255, 0.035);
+  --field-focused: rgba(255, 255, 255, 0.065);
+  --hairline: rgba(255, 255, 255, 0.075);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+  --text: #f4f5f7;
+  --text-2: rgba(244, 245, 247, 0.6);
+  --text-3: rgba(244, 245, 247, 0.36);
+  --text-faint: rgba(244, 245, 247, 0.18);
+  --ice: #9db8ff;
+  --ice-deep: #4a63d9;
+  --mint: #7fdcb8;
+  --amber: #e3a55f;
+  --coral: #ff8a80;
+  --violet: #b79cff;
+  --snappy: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --font: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Code', 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--void);
+  color: var(--text);
+  font: 13.5px/1.45 var(--font);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+body.transparent { background: transparent; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+input, textarea, select { font: inherit; color: inherit; }
+::selection { background: rgba(157, 184, 255, 0.35); }
+.selectable { user-select: text; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.18); }
+::-webkit-scrollbar-track { background: transparent; }
+
+.scroll { overflow-y: auto; overflow-x: hidden; }
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* Type scale — Typo in the Mac app */
+.t-display { font-weight: 600; letter-spacing: -0.02em; line-height: 1.12; }
+.t-title { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.t-headline { font-size: 14px; font-weight: 600; }
+.t-body { font-size: 13.5px; }
+.t-callout { font-size: 12.5px; }
+.t-caption { font-size: 11.5px; }
+.t-mono { font: 11.5px/1.5 var(--mono); }
+.eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.c2 { color: var(--text-2); } .c3 { color: var(--text-3); } .cf { color: var(--text-faint); }
+.clamp1, .clamp2, .clamp3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp1 { -webkit-line-clamp: 1; } .clamp2 { -webkit-line-clamp: 2; } .clamp3 { -webkit-line-clamp: 3; }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Card — Card modifier */
+.card {
+  position: relative;
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.028);
+  box-shadow: inset 0 0 0 0.75px transparent;
+}
+.card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 0.75px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.card.hl { background: rgba(255, 255, 255, 0.055); }
+.card.hl::before { background: linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0.03)); }
+
+/* Buttons — SignalButtonStyle / GhostButtonStyle / IconButton */
+.btn-signal {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--void);
+  padding: 9px 16px; border-radius: 999px;
+  background: linear-gradient(to bottom, #fff, var(--ice));
+  box-shadow: 0 4px 14px rgba(157, 184, 255, 0.35);
+  transition: transform .18s var(--snappy), box-shadow .18s var(--snappy), opacity .18s;
+}
+.btn-signal:hover { box-shadow: 0 6px 22px rgba(157, 184, 255, 0.5); }
+.btn-signal:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(157, 184, 255, 0.1); }
+.btn-signal:disabled { opacity: 0.4; }
+.btn-signal.sm { font-size: 12px; padding: 6px 12px; }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  padding: 8px 14px; border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  box-shadow: inset 0 0 0 0.75px var(--hairline);
+  transition: background .18s var(--snappy), transform .18s var(--snappy);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.07); }
+.btn-ghost:active { background: rgba(255,255,255,0.10); transform: scale(0.98); }
+.btn-ghost.sm { font-size: 12px; padding: 5px 10px; }
+.btn-ghost:disabled { opacity: 0.4; }
+
+.icon-btn {
+  display: inline-grid; place-items: center; border-radius: 999px;
+  color: var(--text-2); transition: background .15s, color .15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+/* Field — SyphTextField */
+.field {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 0.75px var(--hairline);
+  transition: background .18s var(--snappy), box-shadow .18s var(--snappy);
+}
+.field:focus-within { background: var(--field-focused); box-shadow: inset 0 0 0 1px rgba(157,184,255,0.55); }
+.field input, .field textarea { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 13.5px; color: var(--text); user-select: text; }
+.field input::placeholder, .field textarea::placeholder { color: var(--text-3); }
+.field svg { color: var(--text-3); flex: none; }
+
+/* Chip, KeyCap */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.keycap {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
+  font-size: 10.5px; font-weight: 500; color: var(--text-2);
+  border-radius: 4.5px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 0.75px var(--hairline);
+}
+
+/* Segmented control — Picker(.segmented) */
+.segmented { display: flex; padding: 2px; border-radius: 8px; background: rgba(255,255,255,0.05); box-shadow: inset 0 0 0 0.75px var(--hairline); }
+.segmented button { flex: 1; font-size: 12.5px; padding: 5px 8px; border-radius: 6px; color: var(--text-2); transition: background .18s var(--snappy), color .18s; }
+.segmented button:hover { color: var(--text); }
+.segmented button.on { background: rgba(255,255,255,0.12); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+/* Switch — Toggle(.switch) */
+.switch { position: relative; width: 32px; height: 18px; border-radius: 999px; background: rgba(255,255,255,0.14); transition: background .2s var(--snappy); flex: none; }
+.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #d8dae0; transition: transform .2s var(--snappy); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.switch.on { background: var(--mint); }
+.switch.on::after { transform: translateX(14px); background: #fff; }
+
+.hairline-b { box-shadow: inset 0 -0.5px 0 var(--hairline); }
+.divider-v { width: 0.5px; align-self: stretch; background: var(--hairline); flex: none; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes pulse-ring { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+.fade-in { animation: fade-in .35s var(--snappy) both; }
+.pop-in { animation: pop-in .3s var(--snappy) both; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

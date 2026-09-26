@@ -1,0 +1,100 @@
+name: Syph for Mac
+
+on:
+  push:
+    paths:
+      - "mac/**"
+      - ".github/workflows/mac-build.yml"
+  pull_request:
+    paths:
+      - "mac/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild -project mac/Syph-Mac.xcodeproj -scheme Syph -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee build.log | grep -E "error:|warning: unre|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build.log
+      - name: Screenshots (demo fixture)
+        run: |
+          APP="build/Build/Products/Debug/Syph.app/Contents/MacOS/Syph"
+          mkdir -p shots
+          system_profiler SPDisplaysDataType | grep -i resolution || true
+          shoot() {
+            name=$1; shift
+            "$APP" -SyphDemo YES "$@" > /dev/null 2>&1 &
+            pid=$!
+            sleep 9
+            screencapture -x "shots/$name.png" || true
+            kill $pid || true
+            sleep 2
+          }
+          for section in chat team approvals work library computer settings; do
+            shoot "$section" -SyphSection "$section"
+          done
+          shoot consent -SyphSection computer -SyphDemoConsent YES
+          ls -la shots
+      - name: End-to-end computer control (device contract)
+        run: |
+          defaults write Ozyan.SyphMac syph.computer.enabled -bool YES
+          defaults write Ozyan.SyphMac syph.computer.modes -dict observe allow screen allow control allow apps allow clipboard allow files_read allow files_write allow automation allow shell allow
+          python3 mac/CI/device_contract_e2e.py > e2e.log 2>&1 &
+          HARNESS=$!
+          sleep 2
+          APP="build/Build/Products/Debug/Syph.app/Contents/MacOS/Syph"
+          "$APP" -SyphServer http://127.0.0.1:8765 -SyphEmail ryan@jarvis.local -SyphPassword e2e -SyphSection computer > app.log 2>&1 &
+          APP_PID=$!
+          sleep 25
+          screencapture -x shots/e2e-live.png || true
+          set +e
+          wait $HARNESS
+          status=$?
+          set -e
+          screencapture -x shots/e2e.png || true
+          kill $APP_PID || true
+          cat e2e.log
+          echo "--- app log"; tail -30 app.log
+          exit $status
+      - name: Commit screenshots (manual runs)
+        if: always() && github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p docs/mac-screenshots
+          for f in shots/*.png; do
+            sips -Z 1600 "$f" --out "docs/mac-screenshots/$(basename "$f")" > /dev/null
+          done
+          git config user.name "syph-ci"
+          git config user.email "ci@syph.invalid"
+          git add docs/mac-screenshots
+          git commit -m "Update Syph for Mac screenshots [skip ci]" || exit 0
+          git push origin HEAD:${{ github.ref_name }}
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: Syph-macOS-screenshots
+          path: shots
+      - name: Errors
+        if: failure()
+        run: grep -E "error:" build.log | sort -u | head -150 || true
+      - name: Upload app
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Syph-macOS-unsigned
+          path: build/Build/Products/Debug/Syph.app
