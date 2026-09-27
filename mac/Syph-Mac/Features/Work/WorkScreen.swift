@@ -156,7 +156,7 @@ struct LibraryScreen: View {
                                     Spacer()
                                 }
                                 .padding(10)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(selected?.id == doc.id ? Color.white.opacity(0.07) : .clear))
+                                .background(RoundedRectangle(cornerRadius: 10).fill(selected?.id == doc.id ? Palette.overlay.opacity(0.07) : .clear))
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)

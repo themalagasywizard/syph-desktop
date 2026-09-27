@@ -75,13 +75,14 @@ struct Sidebar: View {
                     Text(String(user.name.prefix(1)).uppercased())
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.white.opacity(0.08)))
+                        .background(Circle().fill(Palette.overlay.opacity(0.08)))
                     VStack(alignment: .leading, spacing: 0) {
                         Text(user.name).font(Typo.callout).foregroundStyle(Palette.text).lineLimit(1)
                         Text(user.email).font(Typo.caption).foregroundStyle(Palette.textTertiary).lineLimit(1)
                     }
                 }
                 Spacer()
+                ThemeButton()
                 IconButton(symbol: "slider.horizontal.3", help: "Settings") { app.go(.settings) }
             }
             .padding(.horizontal, 14)
@@ -132,7 +133,7 @@ private struct SidebarRow: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.07) : (hovering ? Color.white.opacity(0.035) : .clear))
+                    .fill(selected ? Palette.overlay.opacity(0.07) : (hovering ? Palette.overlay.opacity(0.035) : .clear))
             )
             .overlay(alignment: .leading) {
                 if selected {
@@ -173,8 +174,8 @@ private struct EmployeeRailRow: View {
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(store.selectedEmployee?.id == employee.id && app.section == .chat ? Color.white.opacity(0.06)
-                          : (hovering ? Color.white.opacity(0.03) : .clear))
+                    .fill(store.selectedEmployee?.id == employee.id && app.section == .chat ? Palette.overlay.opacity(0.06)
+                          : (hovering ? Palette.overlay.opacity(0.03) : .clear))
             )
             .contentShape(Rectangle())
         }
@@ -219,7 +220,7 @@ struct ComputerStatusTile: View {
                           pulsing: bridge.isRunning, size: 6)
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 11).fill(Color.white.opacity(0.03)))
+            .background(RoundedRectangle(cornerRadius: 11).fill(Palette.overlay.opacity(0.03)))
             .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Palette.hairline, lineWidth: 0.75))
         }
         .buttonStyle(.plain)

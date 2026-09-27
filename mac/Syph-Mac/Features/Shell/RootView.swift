@@ -87,7 +87,7 @@ struct SignInView: View {
                 }
                 Button(action: submit) {
                     HStack {
-                        if store.isSigningIn { ProgressView().controlSize(.small).tint(Palette.void) }
+                        if store.isSigningIn { ProgressView().controlSize(.small).tint(Palette.onSignal) }
                         Text(store.isSigningIn ? "Signing in" : "Continue")
                         Image(systemName: "arrow.right")
                     }
@@ -117,7 +117,7 @@ struct SignInView: View {
                     .background(VisualEffect(material: .hudWindow).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)))
             )
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 0.75))
-            .shadow(color: .black.opacity(0.5), radius: 40, y: 20)
+            .shadow(color: Palette.shadow.opacity(0.5), radius: 40, y: 20)
             .padding(56)
         }
         .onAppear { server = store.api.server == APIClient.defaultServer ? "" : store.api.server }
@@ -163,7 +163,7 @@ struct Shell: View {
         }
         .overlay(alignment: .bottom) { ToastLayer() }
         .sheet(isPresented: Binding(get: { app.showHire }, set: { app.showHire = $0 })) {
-            HireSheet().environment(app).environment(store).preferredColorScheme(.dark)
+            HireSheet().environment(app).environment(store).appAppearance()
         }
     }
 }
@@ -200,7 +200,7 @@ struct ToastLayer: View {
         .padding(.vertical, 10)
         .background(Capsule().fill(Palette.panelHigh.opacity(0.95)))
         .overlay(Capsule().strokeBorder(tint.opacity(0.35), lineWidth: 0.75))
-        .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
+        .shadow(color: Palette.shadow.opacity(0.4), radius: 16, y: 6)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }

@@ -11,7 +11,7 @@ struct SyphMacApp: App {
             RootView()
                 .environment(app)
                 .environment(app.store)
-                .preferredColorScheme(.dark)
+                .appAppearance()
                 .frame(minWidth: 1040, minHeight: 660)
                 .task { await app.launch() }
         }
@@ -24,7 +24,7 @@ struct SyphMacApp: App {
             MenuBarPanel()
                 .environment(app)
                 .environment(app.store)
-                .preferredColorScheme(.dark)
+                .appAppearance()
         } label: {
             MenuBarLabel(app: app)
         }
@@ -34,7 +34,7 @@ struct SyphMacApp: App {
             PreferencesView()
                 .environment(app)
                 .environment(app.store)
-                .preferredColorScheme(.dark)
+                .appAppearance()
         }
     }
 }

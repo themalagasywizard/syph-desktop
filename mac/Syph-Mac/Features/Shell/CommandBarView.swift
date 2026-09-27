@@ -34,7 +34,7 @@ struct CommandBarView: View {
                             KeyCap(key: "⇥")
                         }
                         .padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(Capsule().fill(Color.white.opacity(0.06)))
+                        .background(Capsule().fill(Palette.overlay.opacity(0.06)))
                     }
                     .buttonStyle(.plain)
                     .help("Tab to switch employee")
@@ -71,7 +71,7 @@ struct CommandBarView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 10)
-            .background(Color.black.opacity(0.2))
+            .background(Palette.inset)
         }
         .frame(width: 680, height: 420)
         .background(
@@ -86,7 +86,6 @@ struct CommandBarView: View {
                 .strokeBorder(LinearGradient(colors: [Palette.ice.opacity(0.45), Palette.hairline, Palette.hairline],
                                              startPoint: .top, endPoint: .bottom), lineWidth: 1)
         )
-        .preferredColorScheme(.dark)
         .onKeyPress(.tab) { cycle(); return .handled }
         .onKeyPress(.escape) { close(); return .handled }
         .onKeyPress(.return, phases: .down) { press in
@@ -208,7 +207,7 @@ private struct CommandRow: View {
                 Spacer()
             }
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 10).fill(hovering ? Color.white.opacity(0.06) : .clear))
+            .background(RoundedRectangle(cornerRadius: 10).fill(hovering ? Palette.overlay.opacity(0.06) : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

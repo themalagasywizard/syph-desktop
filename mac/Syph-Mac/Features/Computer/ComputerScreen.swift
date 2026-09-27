@@ -86,7 +86,7 @@ private struct ControlHero: View {
         .padding(26)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(LinearGradient(colors: [(on ? Palette.mint : Palette.ice).opacity(0.07), Color.white.opacity(0.015)],
+                .fill(LinearGradient(colors: [(on ? Palette.mint : Palette.ice).opacity(0.07), Palette.overlay.opacity(0.015)],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
         )
         .overlay(

@@ -43,7 +43,7 @@ struct AgentOrb: View {
 
         // Hairline ring
         let ringRect = CGRect(x: radius * 0.16, y: radius * 0.16, width: s - radius * 0.32, height: s - radius * 0.32)
-        context.stroke(Path(ellipseIn: ringRect), with: .color(Color.white.opacity(mood == .offline ? 0.08 : 0.16)), lineWidth: max(0.6, s / 90))
+        context.stroke(Path(ellipseIn: ringRect), with: .color(Palette.overlay.opacity(mood == .offline ? 0.08 : 0.16)), lineWidth: max(0.6, s / 90))
 
         // Travelling arc
         if mood != .paused && mood != .offline {
@@ -131,7 +131,7 @@ struct Backdrop: View {
                     grid.move(to: CGPoint(x: 0, y: y))
                     grid.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                context.stroke(grid, with: .color(Color.white.opacity(0.018 * intensity)), lineWidth: 0.5)
+                context.stroke(grid, with: .color(Palette.overlay.opacity(0.018 * intensity)), lineWidth: 0.5)
             }
         }
         .ignoresSafeArea()

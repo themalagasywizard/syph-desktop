@@ -24,7 +24,7 @@ final class FloatingPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 
     func host<V: View>(_ view: V) {
-        let hosting = NSHostingView(rootView: view)
+        let hosting = NSHostingView(rootView: view.appAppearance())
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         hosting.autoresizingMask = [.width, .height]
         contentView = hosting
@@ -137,7 +137,6 @@ private struct ConsentPanelView: View {
             }
         }
         .frame(width: 440, height: 400, alignment: .top)
-        .preferredColorScheme(.dark)
     }
 }
 
@@ -169,7 +168,7 @@ private struct ConsentCard: View {
                 }
                 .frame(maxHeight: 90)
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.4)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.inset))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.hairline, lineWidth: 0.75))
             }
             HStack(spacing: 6) {
@@ -203,7 +202,7 @@ private struct ConsentCard: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(LinearGradient(colors: [Palette.amber.opacity(0.6), Palette.hairline], startPoint: .top, endPoint: .bottom), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+        .shadow(color: Palette.shadow.opacity(0.5), radius: 24, y: 12)
         .padding(12)
     }
 }

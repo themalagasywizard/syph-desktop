@@ -87,7 +87,7 @@ private struct ApprovalListRow: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(selected ? Color.white.opacity(0.07) : Color.white.opacity(0.02)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(selected ? Palette.overlay.opacity(0.07) : Palette.overlay.opacity(0.02)))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(selected ? Palette.amber.opacity(0.5) : Palette.hairline, lineWidth: 0.75))
         .contentShape(Rectangle())
     }

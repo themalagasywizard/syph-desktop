@@ -132,7 +132,7 @@ struct MarkdownText: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code).font(Typo.mono).foregroundStyle(Palette.text.opacity(0.88)).padding(12)
             }
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.35)))
+            .background(RoundedRectangle(cornerRadius: 10).fill(Palette.inset))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.hairline, lineWidth: 0.75))
         case .rule:
             Rectangle().fill(Palette.hairline).frame(height: 0.5).padding(.vertical, 4)

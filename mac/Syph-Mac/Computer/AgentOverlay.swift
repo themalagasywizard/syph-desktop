@@ -126,6 +126,5 @@ private struct DrivingPill: View {
         .scaleEffect(overlay.visible ? 1 : 0.9)
         .opacity(overlay.visible ? 1 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .preferredColorScheme(.dark)
     }
 }

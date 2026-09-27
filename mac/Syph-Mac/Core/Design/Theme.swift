@@ -6,29 +6,70 @@ enum Brand {
     static let company = "Syph Software"
 }
 
-/// Tokens carried over from the Syph entry surfaces on iPhone: a near-black
-/// void, cool hairlines, an ice-blue signal and mint for "done".
+enum AppTheme: String {
+    case dark, light
+
+    static let storageKey = "syph.appearance"
+    var colorScheme: ColorScheme { self == .light ? .light : .dark }
+    var opposite: AppTheme { self == .light ? .dark : .light }
+}
+
+/// All windows and floating panels share the same persisted appearance.
+private struct AppAppearance: ViewModifier {
+    @AppStorage(AppTheme.storageKey) private var selection = AppTheme.dark.rawValue
+
+    func body(content: Content) -> some View {
+        let theme = AppTheme(rawValue: selection) ?? .dark
+        content
+            .preferredColorScheme(theme.colorScheme)
+            .environment(\.colorScheme, theme.colorScheme)
+    }
+}
+
+extension View {
+    func appAppearance() -> some View { modifier(AppAppearance()) }
+}
+
+/// Semantic colors resolve against the appearance of each hosting view.
+/// Dark retains the original near-black surfaces; light uses cool ivory and ink.
 enum Palette {
-    static let void = Color(hex: 0x050507)
-    static let voidRaised = Color(hex: 0x0A0B0F)
-    static let panel = Color(hex: 0x0E1015)
-    static let panelHigh = Color(hex: 0x141720)
-    static let field = Color.white.opacity(0.035)
-    static let fieldFocused = Color.white.opacity(0.065)
-    static let hairline = Color.white.opacity(0.075)
-    static let hairlineStrong = Color.white.opacity(0.16)
+    static let void = adaptive(light: 0xF5F6FA, dark: 0x050507)
+    static let voidRaised = adaptive(light: 0xEDF0F6, dark: 0x0A0B0F)
+    static let panel = adaptive(light: 0xFFFFFF, dark: 0x0E1015)
+    static let panelHigh = adaptive(light: 0xE8ECF4, dark: 0x141720)
+    static let overlay = adaptive(light: 0x172139, dark: 0xFFFFFF)
+    static let field = overlay.opacity(0.035)
+    static let fieldFocused = overlay.opacity(0.065)
+    static let hairline = overlay.opacity(0.075)
+    static let hairlineStrong = overlay.opacity(0.16)
 
-    static let text = Color(hex: 0xF4F5F7)
-    static let textSecondary = Color(hex: 0xF4F5F7).opacity(0.60)
-    static let textTertiary = Color(hex: 0xF4F5F7).opacity(0.36)
-    static let textFaint = Color(hex: 0xF4F5F7).opacity(0.18)
+    static let text = adaptive(light: 0x182033, dark: 0xF4F5F7)
+    static let textSecondary = adaptive(light: 0x505C72, dark: 0xF4F5F7, darkOpacity: 0.60)
+    static let textTertiary = adaptive(light: 0x626D80, dark: 0xF4F5F7, darkOpacity: 0.36)
+    static let textFaint = adaptive(light: 0x8892A3, dark: 0xF4F5F7, darkOpacity: 0.18)
 
-    static let ice = Color(hex: 0x9DB8FF)
-    static let iceDeep = Color(hex: 0x4A63D9)
-    static let mint = Color(hex: 0x7FDCB8)
-    static let amber = Color(hex: 0xE3A55F)
-    static let coral = Color(hex: 0xFF8A80)
-    static let violet = Color(hex: 0xB79CFF)
+    static let ice = adaptive(light: 0x3556B8, dark: 0x9DB8FF)
+    static let iceDeep = adaptive(light: 0x4A63D9, dark: 0x4A63D9)
+    static let mint = adaptive(light: 0x187653, dark: 0x7FDCB8)
+    static let amber = adaptive(light: 0x935B12, dark: 0xE3A55F)
+    static let coral = adaptive(light: 0xBD3E37, dark: 0xFF8A80)
+    static let violet = adaptive(light: 0x7451B8, dark: 0xB79CFF)
+    static let signalTop = adaptive(light: 0x3556B8, dark: 0xFFFFFF)
+    static let signalBottom = adaptive(light: 0x294493, dark: 0x9DB8FF)
+    static let onSignal = adaptive(light: 0xFFFFFF, dark: 0x050507)
+    static let inset = adaptive(light: 0x172139, dark: 0x000000, lightOpacity: 0.045, darkOpacity: 0.35)
+    static let shadow = adaptive(light: 0x172139, dark: 0x000000, lightOpacity: 0.16)
+
+    private static func adaptive(light: UInt32, dark: UInt32, lightOpacity: Double = 1, darkOpacity: Double = 1) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let hex = isDark ? dark : light
+            return NSColor(srgbRed: Double((hex >> 16) & 0xFF) / 255,
+                           green: Double((hex >> 8) & 0xFF) / 255,
+                           blue: Double(hex & 0xFF) / 255,
+                           alpha: isDark ? darkOpacity : lightOpacity)
+        })
+    }
 
     static let signal = LinearGradient(colors: [ice, iceDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
     static let aurora = AngularGradient(colors: [ice, mint, violet, iceDeep, ice], center: .center)
@@ -49,7 +90,11 @@ enum Palette {
         for byte in id.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
         let hues: [Double] = [0.62, 0.55, 0.47, 0.72, 0.80, 0.08, 0.40]
         let h = hues[Int(hash % UInt64(hues.count))]
-        return Color(hue: h, saturation: 0.45, brightness: 1.0)
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(calibratedHue: h, saturation: isDark ? 0.45 : 0.72,
+                           brightness: isDark ? 1.0 : 0.58, alpha: 1)
+        })
     }
 }
 
@@ -94,12 +139,14 @@ struct VisualEffect: NSViewRepresentable {
         view.material = material
         view.blendingMode = blending
         view.state = .active
+        view.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         return view
     }
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {
         view.material = material
         view.blendingMode = blending
+        view.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
     }
 }
 
@@ -113,13 +160,13 @@ struct Card: ViewModifier {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Color.white.opacity(highlighted ? 0.055 : 0.028))
+                    .fill(Palette.overlay.opacity(highlighted ? 0.055 : 0.028))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [Color.white.opacity(highlighted ? 0.22 : 0.10), Color.white.opacity(0.03)],
+                            colors: [Palette.overlay.opacity(highlighted ? 0.22 : 0.10), Palette.overlay.opacity(0.03)],
                             startPoint: .top, endPoint: .bottom
                         ),
                         lineWidth: 0.75
@@ -147,12 +194,12 @@ struct SignalButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: compact ? 12 : 13, weight: .semibold))
-            .foregroundStyle(Palette.void)
+            .foregroundStyle(Palette.onSignal)
             .padding(.horizontal, compact ? 12 : 16)
             .padding(.vertical, compact ? 6 : 9)
             .background(
                 Capsule(style: .continuous)
-                    .fill(LinearGradient(colors: [Color.white, Palette.ice], startPoint: .top, endPoint: .bottom))
+                    .fill(LinearGradient(colors: [Palette.signalTop, Palette.signalBottom], startPoint: .top, endPoint: .bottom))
             )
             .shadow(color: Palette.ice.opacity(configuration.isPressed ? 0.1 : 0.35), radius: 14, y: 4)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -174,7 +221,7 @@ struct GhostButtonStyle: ButtonStyle {
             .padding(.vertical, compact ? 5 : 8)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : (hovering ? 0.07 : 0.04)))
+                    .fill(Palette.overlay.opacity(configuration.isPressed ? 0.10 : (hovering ? 0.07 : 0.04)))
             )
             .overlay(Capsule(style: .continuous).strokeBorder(Palette.hairline, lineWidth: 0.75))
             .onHover { hovering = $0 }
@@ -196,12 +243,26 @@ struct IconButton: View {
                 .font(.system(size: size * 0.46, weight: .medium))
                 .foregroundStyle(hovering ? Palette.text : tint)
                 .frame(width: size, height: size)
-                .background(Circle().fill(Color.white.opacity(hovering ? 0.08 : 0)))
+                .background(Circle().fill(Palette.overlay.opacity(hovering ? 0.08 : 0)))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(help)
         .accessibilityLabel(help.isEmpty ? symbol : help)
+    }
+}
+
+/// One action and preference for every appearance control.
+struct ThemeButton: View {
+    @AppStorage(AppTheme.storageKey) private var selection = AppTheme.dark.rawValue
+
+    var body: some View {
+        let theme = AppTheme(rawValue: selection) ?? .dark
+        IconButton(symbol: theme == .dark ? "sun.max" : "moon", help: "Switch to \(theme.opposite.rawValue) mode") {
+            selection = theme.opposite.rawValue
+        }
+        .accessibilityValue("\(theme.rawValue.capitalized) mode")
+        .accessibilityIdentifier("appearanceToggle")
     }
 }
 
@@ -269,7 +330,7 @@ struct KeyCap: View {
             .foregroundStyle(Palette.textSecondary)
             .padding(.horizontal, 5)
             .frame(minWidth: 18, minHeight: 18)
-            .background(RoundedRectangle(cornerRadius: 4.5).fill(Color.white.opacity(0.06)))
+            .background(RoundedRectangle(cornerRadius: 4.5).fill(Palette.overlay.opacity(0.06)))
             .overlay(RoundedRectangle(cornerRadius: 4.5).strokeBorder(Palette.hairline, lineWidth: 0.75))
     }
 }
