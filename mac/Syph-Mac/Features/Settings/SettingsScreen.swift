@@ -132,7 +132,7 @@ private struct IntegrationsSection: View {
         SettingsGroup(title: "Connected tools", symbol: "point.3.connected.trianglepath.dotted") {
             ForEach(store.accountTools) { tool in
                 HStack(spacing: 12) {
-                    StatusDot(color: tool.connected ? Palette.mint : Palette.textFaint, size: 6)
+                    IntegrationMark(id: tool.id, size: 26)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(tool.name).font(Typo.callout).foregroundStyle(Palette.text)
                         Text(tool.description).font(Typo.caption).foregroundStyle(Palette.textTertiary).lineLimit(1)

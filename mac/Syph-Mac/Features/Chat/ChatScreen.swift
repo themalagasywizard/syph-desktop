@@ -207,7 +207,7 @@ struct MessageRow: View {
         } else {
             let parsed = MessageParser.parse(message.body)
             HStack(alignment: .top, spacing: 12) {
-                Monogram(employee: employee, size: 26)
+                AgentOrb(mood: .idle, tint: Palette.hue(for: employee.id), size: 26)
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Text(employee.name).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
