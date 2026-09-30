@@ -52,14 +52,30 @@ WINDOWS_CASES = [
     ("clipboard_write", {"text": MARKER}, True),
     ("clipboard_read", {}, True),
     ("open_app", {"app": "Notepad"}, True),
+    ("type_text", {"text": f"{MARKER} héllo ✓"}, True),
     ("read_screen", {}, True),
     ("read_ui", {}, True),
-    ("quit_app", {"app": "Notepad"}, True),
+    # Native helper operations (SyphHost.exe): element ids come from the read_ui above.
+    ("read_text", lambda r: {"element": _text_area(r)}, True),
+    ("set_value", lambda r: {"element": _text_area(r), "text": MARKER + " set"}, True),
+    ("list_windows", {}, True),
+    ("window", {"action": "snap_left", "app": "Notepad"}, True),
+    ("press_keys", {"keys": "ctrl+a delete"}, True),
+    ("quit_app", {"app": "Notepad"}, None),  # classic Notepad may ask to save
+    ("press", {"title": "Don't Save"}, None),
     ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
     ("trash_file", {"path": "e2e/hello.txt"}, True),
 ]
 
 CASES = WINDOWS_CASES if PLATFORM == "windows" else MAC_CASES
+
+
+def _text_area(results_by_op):
+    """The id of the first document / edit control in the latest read_ui result."""
+    for element in (results_by_op.get("read_ui") or {}).get("elements", []):
+        if element.get("role") in ("Document", "Edit"):
+            return element.get("id")
+    return -1
 
 lock = threading.Lock()
 queue = [
@@ -149,6 +165,10 @@ class Handler(BaseHTTPRequestHandler):
                         busy = any(c.get("sent") and c["id"] not in results for c in queue)
                         if pending and not busy:
                             pending["sent"] = True
+                            if callable(pending["arguments"]):
+                                # Arguments built from earlier results (e.g. an element id from read_ui).
+                                by_op = {c["operation"]: (results.get(c["id"]) or {}).get("data") or {} for c in queue if c["id"] in results}
+                                pending["arguments"] = pending["arguments"](by_op)
                             return self.reply(200, {"command": command_out(pending)})
                     if time.monotonic() >= deadline:
                         return self.reply(200, {"command": None})
@@ -201,6 +221,7 @@ def main() -> int:
             "run_shell": lambda: "shell-ok" in data.get("stdout", "") and MARKER in data.get("stdout", ""),
             "applescript": lambda: PLATFORM != "macos" or data.get("stdout", "").strip() == "5",
             "clipboard_read": lambda: data.get("content") == MARKER,
+            "read_text": lambda: MARKER in data.get("content", "") and "héllo ✓" in data.get("content", ""),
         }
         if ok and cmd["operation"] in checks and not checks[cmd["operation"]]():
             verdict = "WRONG DATA"

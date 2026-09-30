@@ -29,12 +29,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
       - name: Install
         working-directory: windows
         run: npm ci
       - name: Typecheck
         working-directory: windows
         run: npm run typecheck
+      - name: Build native helper (SyphHost.exe)
+        working-directory: windows
+        run: |
+          npm run build:host
+          Get-Item host\publish\SyphHost.exe | Format-Table Name, Length
+      - name: Native helper self-test (real desktop)
+        working-directory: windows
+        run: |
+          New-Item -ItemType Directory -Force ..\shots | Out-Null
+          $p = Start-Process host\publish\SyphHost.exe -ArgumentList '--selftest', '--out', '..\shots\host-selftest.json' -PassThru -Wait -NoNewWindow
+          Get-Content ..\shots\host-selftest.json
+          if ($p.ExitCode -ne 0) { Write-Error "host self-test failed"; exit 1 }
       - name: Build (unpacked + portable)
         working-directory: windows
         run: |

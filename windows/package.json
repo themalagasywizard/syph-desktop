@@ -2,7 +2,7 @@
   "name": "syph-windows",
   "productName": "Syph",
   "version": "1.0.0",
-  "description": "Syph for Windows \u2014 your AI team on your PC.",
+  "description": "Syph for Windows — your AI team on your PC.",
   "author": "Syph Software",
   "private": true,
   "main": "dist/main/main.js",
@@ -13,13 +13,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev:web": "vite",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --win portable --x64",
-    "shots": "node scripts/screenshots.mjs"
+    "dist": "npm run build && npm run build:host && electron-builder --win portable --x64",
+    "shots": "node scripts/screenshots.mjs",
+    "build:host": "dotnet publish host/SyphHost.csproj -c Release -r win-x64 --self-contained true -o host/publish -nologo"
   },
   "build": {
     "appId": "com.syph.desktop",
     "productName": "Syph",
-    "copyright": "\u00a9 2026 Syph Software",
+    "copyright": "© 2026 Syph Software",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -27,12 +28,20 @@
     "files": [
       "dist/**",
       "package.json",
-      "resources/**"
+      "resources/**",
+      "!resources/host/**"
     ],
     "extraResources": [
       {
         "from": "resources/ps",
         "to": "ps"
+      },
+      {
+        "from": "host/publish",
+        "to": "host",
+        "filter": [
+          "SyphHost.exe"
+        ]
       }
     ],
     "afterPack": "scripts/after-pack.cjs",

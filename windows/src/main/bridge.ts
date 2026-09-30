@@ -8,6 +8,7 @@ import type {
 } from '../shared/types'
 import { api } from './api'
 import { Executor, type ExecutionResult } from './executor'
+import { host as nativeHost } from './host'
 import { Policy, scopeFor } from './policy'
 
 export interface BridgeHost {
@@ -46,6 +47,13 @@ export function headline(c: DeviceCommand): string {
     case 'quit_app': return `Quit ${a.app ?? 'an app'}`
     case 'open_url': { try { return `Open ${new URL(String(a.url)).hostname}` } catch { return 'Open a link' } }
     case 'read_screen': case 'read_ui': return 'Read your screen'
+    case 'set_value': return 'Fill in a field'
+    case 'drag': return 'Drag on screen'
+    case 'move': return 'Move the pointer'
+    case 'read_text': return 'Read the text of a window'
+    case 'window': return `${String(a.action ?? 'focus').replace(/_/g, ' ').replace(/^\w/, (x) => x.toUpperCase())} ${a.window ?? a.app ?? 'a window'}`
+    case 'list_windows': return 'See what’s open'
+    case 'list_apps': return 'See installed apps'
     default: return c.operation.replace(/_/g, ' ').replace(/^\w/, (s) => s.toUpperCase())
   }
 }
@@ -121,6 +129,9 @@ export class DeviceBridge {
   emergencyStop() {
     this.abortCurrent = true
     this.policy.setEnabled(false)
+    // Stop mid-action: killing the helper halts typing or dragging at once;
+    // it restarts on the next command.
+    if (this.current) nativeHost.stop()
     this.host.cancelConsent()
     this.host.hideOverlay(0)
     if (this.current) {
@@ -139,6 +150,7 @@ export class DeviceBridge {
       appVersion: app.getVersion(),
       controlEnabled: this.policy.state.controlEnabled,
       scopes: this.policy.wireScopes(),
+      capabilities: this.executor.capabilities(),
     }
   }
 

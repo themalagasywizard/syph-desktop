@@ -12,9 +12,10 @@ export const DEFAULT_MODES: Record<Scope, ScopeMode> = {
 
 export function scopeFor(operation: string): Scope | null {
   switch (operation) {
-    case 'observe': case 'notify': return 'observe'
-    case 'read_screen': case 'read_ui': return 'screen'
-    case 'click': case 'click_text': case 'press': case 'type_text': case 'press_keys': case 'scroll': return 'control'
+    case 'observe': case 'notify': case 'list_windows': case 'list_apps': return 'observe'
+    case 'read_screen': case 'read_ui': case 'read_text': return 'screen'
+    case 'click': case 'click_text': case 'press': case 'type_text': case 'press_keys': case 'scroll':
+    case 'set_value': case 'drag': case 'move': case 'window': return 'control'
     case 'open_app': case 'quit_app': case 'open_url': return 'apps'
     case 'list_files': case 'read_file': return 'files_read'
     case 'write_file': case 'trash_file': return 'files_write'
