@@ -20,10 +20,10 @@
       "verify": "$t = (Get-Content \"$env:SYPH\\total.txt\" -Raw -ErrorAction Stop) -replace '[^0-9.]', ''; if ([double]$t -ne 4872.5) { exit 1 }"
     },
     {
-      "id": "web-heading",
-      "prompt": "Using Syph's browser, go to example.com and find the main heading on the page. Save that heading into heading.txt in my Syph folder.",
-      "setup": "Remove-Item \"$env:SYPH\\heading.txt\" -ErrorAction SilentlyContinue",
-      "verify": "if ((Get-Content \"$env:SYPH\\heading.txt\" -Raw -ErrorAction Stop) -notmatch 'Example Domain') { exit 1 }"
+      "id": "web-hours",
+      "prompt": "Using Syph's browser, open http://127.0.0.1:8777/about and find the shop's Saturday opening hours. Save just those hours into hours.txt in my Syph folder.",
+      "setup": "Remove-Item \"$env:SYPH\\hours.txt\" -ErrorAction SilentlyContinue",
+      "verify": "$t = Get-Content \"$env:SYPH\\hours.txt\" -Raw -ErrorAction Stop; if ($t -notmatch '9(:00)?\\s*(am|AM)?\\s*[-–to]+\\s*1(:00)?\\s*(pm|PM)|09:00\\s*[-–]\\s*13:00') { exit 1 }"
     },
     {
       "id": "web-form",

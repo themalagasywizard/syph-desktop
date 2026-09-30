@@ -77,7 +77,8 @@ WINDOWS_CASES = [
     ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
     # Syph's own browser (Edge profile over the DevTools protocol)
     ("browser_open", {"url": "https://example.com"}, True, lambda d: "Example" in d.get("title", "") and bool(d.get("_image"))),
-    ("browser_read", {}, True, lambda d: "example domain" in d.get("content", "").lower()),
+    # example.com's body no longer says "Example Domain" (only its title does); check the page text itself.
+    ("browser_read", {}, True, lambda d: "documentation examples" in d.get("content", "").lower()),
     ("browser_snapshot", {}, True, lambda d: any(e.get("role") == "link" for e in d.get("elements", []))),
     ("excel_list", {}, None),  # hosted runners have no Office; reported either way
     ("trash_file", {"path": "e2e/hello.txt"}, True),

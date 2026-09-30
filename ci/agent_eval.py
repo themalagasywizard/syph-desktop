@@ -62,11 +62,16 @@ class FormSite(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    ABOUT = """<!doctype html><title>Northwind Traders</title><h1>Northwind Traders</h1><h2>Opening hours</h2>
+<table><tr><td>Monday to Friday</td><td>8:30 am – 6 pm</td></tr><tr><td>Saturday</td><td>9 am – 1 pm</td></tr>
+<tr><td>Sunday</td><td>Closed</td></tr></table>""".encode()
+
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(self.PAGE if self.path.startswith("/form") else b"<h1>Thanks, we got your message.</h1>")
+        page = self.PAGE if self.path.startswith("/form") else self.ABOUT if self.path.startswith("/about") else b"<h1>Thanks, we got your message.</h1>"
+        self.wfile.write(page)
 
     def do_POST(self):
         fields = urllib.parse.parse_qs(self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode())
