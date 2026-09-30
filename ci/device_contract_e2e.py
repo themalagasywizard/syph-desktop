@@ -55,6 +55,8 @@ WINDOWS_CASES = [
     ("clipboard_write", {"text": MARKER}, True),
     ("clipboard_read", {}, True),
     ("open_app", {"app": "Notepad"}, True),
+    ("wait_for", {"until": "window", "text": "Notepad", "timeout": 5}, True, lambda d: bool(d.get("_image"))),
+    ("wait_for", {"until": "text", "text": "zzqx never on screen", "timeout": 1}, False),
     ("type_text", {"text": f"{MARKER} héllo ✓"}, True),
     ("read_screen", {}, True),
     ("read_ui", {}, True),
@@ -72,7 +74,7 @@ WINDOWS_CASES = [
     ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
     # Syph's own browser (Edge profile over the DevTools protocol)
     ("browser_open", {"url": "https://example.com"}, True, lambda d: "Example" in d.get("title", "") and bool(d.get("_image"))),
-    ("browser_read", {}, True, lambda d: "Example Domain" in d.get("content", "")),
+    ("browser_read", {}, True, lambda d: "example domain" in d.get("content", "").lower()),
     ("browser_snapshot", {}, True, lambda d: any(e.get("role") == "link" for e in d.get("elements", []))),
     ("excel_list", {}, None),  # hosted runners have no Office; reported either way
     ("trash_file", {"path": "e2e/hello.txt"}, True),
@@ -249,6 +251,8 @@ def main() -> int:
         extra += f" image={len(data.get('_image', '')) // 1024}KB" if data.get("_image") else ""
         extra += f" thumbnail={'yes' if data.get('_image') else 'no'}" if cmd["operation"] == "read_screen" else ""
         print(f"[{verdict:10s}] {cmd['operation']:15s} {got.get('status'):9s} {got.get('summary', '')}{extra}  {json.dumps(slim)[:220]}")
+        if verdict != "ok":
+            print(f"             arguments: {json.dumps(cmd['arguments'])[:300]}\n             data: {json.dumps(slim, ensure_ascii=False)[:900]}")
     print(f"{len(queue) - failures}/{len(queue)} cases as expected", flush=True)
     server.shutdown()
     return 1 if failures else 0

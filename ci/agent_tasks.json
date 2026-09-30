@@ -1,0 +1,48 @@
+{
+  "note": "Real small-business chores for an employee with the Computer tool, run end to end on a Windows PC and checked on disk or on screen. SYPH is the first shared folder (Documents\\Syph). A verify script exits 0 on success.",
+  "tasks": [
+    {
+      "id": "notepad-note",
+      "prompt": "On my PC, open Notepad, write the note 'Call the supplier on Monday about order 1182.' and save it as supplier-note.txt in my Syph folder in Documents. Then close Notepad.",
+      "setup": "Remove-Item \"$env:SYPH\\supplier-note.txt\" -ErrorAction SilentlyContinue",
+      "verify": "$t = Get-Content \"$env:SYPH\\supplier-note.txt\" -Raw -ErrorAction Stop; if ($t -notmatch '1182' -or $t -notmatch 'supplier') { exit 1 }; if (Get-Process notepad -ErrorAction SilentlyContinue | Where-Object MainWindowTitle -match 'supplier-note') { exit 2 }"
+    },
+    {
+      "id": "file-invoices",
+      "prompt": "In my Syph folder there is an inbox folder. Move every file with 'invoice' in its name into a new folder called Invoices inside my Syph folder. Leave the other files where they are.",
+      "setup": "Remove-Item \"$env:SYPH\\inbox\",\"$env:SYPH\\Invoices\" -Recurse -Force -ErrorAction SilentlyContinue; New-Item -ItemType Directory \"$env:SYPH\\inbox\" | Out-Null; 'a' | Set-Content \"$env:SYPH\\inbox\\invoice-acme-2026-03.txt\"; 'b' | Set-Content \"$env:SYPH\\inbox\\Invoice_Globex_0412.txt\"; 'c' | Set-Content \"$env:SYPH\\inbox\\2026-04 invoice initech.txt\"; 'd' | Set-Content \"$env:SYPH\\inbox\\meeting-notes.txt\"",
+      "verify": "$moved = @(Get-ChildItem \"$env:SYPH\\Invoices\" -File -ErrorAction Stop).Count; $left = @(Get-ChildItem \"$env:SYPH\\inbox\" -File).Name; if ($moved -ne 3 -or $left -ne 'meeting-notes.txt') { exit 1 }"
+    },
+    {
+      "id": "csv-total",
+      "prompt": "What's the total of the Amount column in sales.csv in my Syph folder? Write just that number into total.txt in the same folder.",
+      "setup": "\"Date,Customer,Amount`n2026-09-01,Acme,1250.50`n2026-09-03,Globex,980`n2026-09-07,Initech,2210.25`n2026-09-12,Umbrella,431.75\" | Set-Content \"$env:SYPH\\sales.csv\"; Remove-Item \"$env:SYPH\\total.txt\" -ErrorAction SilentlyContinue",
+      "verify": "$t = (Get-Content \"$env:SYPH\\total.txt\" -Raw -ErrorAction Stop) -replace '[^0-9.]', ''; if ([double]$t -ne 4872.5) { exit 1 }"
+    },
+    {
+      "id": "web-heading",
+      "prompt": "Using Syph's browser, go to example.com and find the main heading on the page. Save that heading into heading.txt in my Syph folder.",
+      "setup": "Remove-Item \"$env:SYPH\\heading.txt\" -ErrorAction SilentlyContinue",
+      "verify": "if ((Get-Content \"$env:SYPH\\heading.txt\" -Raw -ErrorAction Stop) -notmatch 'Example Domain') { exit 1 }"
+    },
+    {
+      "id": "web-form",
+      "prompt": "Open http://127.0.0.1:8777/form in Syph's browser and send the contact form with name Jane Doe, email jane@example.com and the message 'Please call me back about the quote.'",
+      "setup": "Remove-Item \"$env:SYPH_EVAL_OUT\\form-submissions.json\" -ErrorAction SilentlyContinue",
+      "verify": "$s = Get-Content \"$env:SYPH_EVAL_OUT\\form-submissions.json\" -Raw -ErrorAction Stop | ConvertFrom-Json; $x = @($s)[-1]; if ($x.name -ne 'Jane Doe' -or $x.email -ne 'jane@example.com' -or $x.message -notmatch 'call me back') { exit 1 }"
+    },
+    {
+      "id": "arrange-windows",
+      "prompt": "On my PC, put Notepad on the left half of the screen and the File Explorer window on the right half.",
+      "setup": "Get-Process notepad,explorer -ErrorAction SilentlyContinue | Where-Object MainWindowTitle | ForEach-Object { $_.CloseMainWindow() | Out-Null }; Start-Process notepad; Start-Process explorer.exe $env:SYPH; Start-Sleep 3",
+      "verify": "Add-Type 'using System;using System.Runtime.InteropServices;public class W{[StructLayout(LayoutKind.Sequential)]public struct R{public int L,T,Ri,B;}[DllImport(\"user32.dll\")]public static extern bool GetWindowRect(IntPtr h,out R r);}'; Add-Type -AssemblyName System.Windows.Forms; $mid = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Width / 2; $n = (Get-Process notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1).MainWindowHandle; $e = (Get-Process explorer | Where-Object MainWindowTitle | Select-Object -First 1).MainWindowHandle; $a = New-Object W+R; $b = New-Object W+R; [W]::GetWindowRect($n, [ref]$a) | Out-Null; [W]::GetWindowRect($e, [ref]$b) | Out-Null; if ($a.Ri -gt $mid + 40 -or $b.L -lt $mid - 40) { exit 1 }"
+    },
+    {
+      "id": "excel-budget",
+      "requires": "excel",
+      "prompt": "Create a spreadsheet budget.xlsx in my Syph folder with columns Item and Cost, rows Rent 1200, Software 300 and Travel 450, and a Total row that adds them up with a formula.",
+      "setup": "Remove-Item \"$env:SYPH\\budget.xlsx\" -ErrorAction SilentlyContinue",
+      "verify": "$x = New-Object -ComObject Excel.Application; try { $wb = $x.Workbooks.Open(\"$env:SYPH\\budget.xlsx\"); $ws = $wb.Worksheets.Item(1); $found = $false; foreach ($c in $ws.UsedRange.Cells) { if ($c.HasFormula -and $c.Value2 -eq 1950) { $found = $true } }; $wb.Close($false) } finally { $x.Quit() }; if (-not $found) { exit 1 }"
+    }
+  ]
+}

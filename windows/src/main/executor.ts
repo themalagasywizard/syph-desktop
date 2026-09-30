@@ -25,7 +25,7 @@ function num(command: DeviceCommand, key: string): number | undefined {
 }
 
 /** Operations that only exist with the native helper. */
-export const HOST_OPERATIONS = ['snapshot', 'act', 'set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets',
+export const HOST_OPERATIONS = ['snapshot', 'act', 'wait_for', 'set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets',
   'find_files', 'excel_list', 'excel_read', 'excel_write', 'excel_save', 'word_read', 'word_write', 'word_save',
   'outlook_list', 'outlook_read', 'outlook_search', 'outlook_draft'] as const
 /** Operations that need only Electron (no native helper). */
@@ -93,7 +93,8 @@ export class Executor {
   async run(command: DeviceCommand, scope: Scope | null = null): Promise<ExecutionResult> {
     this.outsideAllowed = scope === 'files_outside'
     const result = await this.perform(command)
-    if (command.arguments.observe === true && ACTING.has(command.operation) && host.available) {
+    const looks = command.operation === 'wait_for'
+    if (host.available && (looks || (command.arguments.observe === true && ACTING.has(command.operation)))) {
       return await this.withScreen(result)
     }
     return result
@@ -101,8 +102,9 @@ export class Executor {
 
   /** Adds the screen as it is after an action: the agent checks it instead of looking again. */
   private async withScreen(result: ExecutionResult): Promise<ExecutionResult> {
-    await new Promise((r) => setTimeout(r, 350)) // let the app repaint
     try {
+      // Wait for the app to finish reacting (menus, page loads, animations), not a fixed pause.
+      await host.call('stable', { quiet: 300, max: 2_000 }, 5_000).catch(() => undefined)
       const shot = await host.call('snapshot', {}, 30_000)
       const view = snapshotView(shot)
       const note = shot.changed === false ? ' The screen did not change.' : ''
@@ -142,6 +144,11 @@ export class Executor {
           }
         }
         case 'act': return await this.act(command)
+        case 'wait_for': {
+          if (!useHost) return this.needsHost('wait_for')
+          const seconds = Math.min(60, Math.max(0.5, Number(a.timeout ?? 15)))
+          return await this.hostResult('wait', { until: str(command, 'until') ?? 'stable', text: str(command, 'text'), role: str(command, 'role'), timeout: seconds }, (seconds + 10) * 1000)
+        }
         case 'observe':
           if (!useHost) return await runScript('observe', {})
           return await this.host('observe', {}, (r) => `${r.front?.app || 'Nothing'} is in front${r.front?.title ? ` (‘${r.front.title}’)` : ''}; ${r.windows.length} windows open.`, (r) => ({

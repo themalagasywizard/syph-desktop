@@ -11,6 +11,11 @@ on:
       - "windows/**"
       - "ci/**"
   workflow_dispatch:
+    inputs:
+      agent_eval:
+        description: "Also run the agent eval against a real server (needs SYPH_EVAL_* secrets)"
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -85,6 +90,23 @@ jobs:
           Get-Content e2e.log
           Get-Content e2e.err -ErrorAction SilentlyContinue
           if ($harness.ExitCode -ne 0) { exit 1 }
+      - name: Agent eval (real server, real model)
+        if: github.event_name == 'workflow_dispatch' && inputs.agent_eval
+        env:
+          SYPH_SERVER: ${{ secrets.SYPH_EVAL_SERVER }}
+          SYPH_EMAIL: ${{ secrets.SYPH_EVAL_EMAIL }}
+          SYPH_PASSWORD: ${{ secrets.SYPH_EVAL_PASSWORD }}
+          SYPH_EMPLOYEE: ${{ secrets.SYPH_EVAL_EMPLOYEE }}
+          SYPH_EVAL_OUT: ${{ github.workspace }}\shots\agent-eval
+        run: |
+          if (-not $env:SYPH_SERVER) { Write-Error "Set the SYPH_EVAL_SERVER, SYPH_EVAL_EMAIL, SYPH_EVAL_PASSWORD and SYPH_EVAL_EMPLOYEE secrets."; exit 1 }
+          $app = Start-Process 'windows\release\win-unpacked\Syph.exe' -ArgumentList "--server=$env:SYPH_SERVER", "--email=$env:SYPH_EMAIL", "--password=$env:SYPH_PASSWORD", '--section=computer' -PassThru
+          Start-Sleep 30
+          python ci/agent_eval.py
+          $code = $LASTEXITCODE
+          & ci\windows-screenshot.ps1 shots\agent-eval-end.png
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          exit $code
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

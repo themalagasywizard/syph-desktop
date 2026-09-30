@@ -91,6 +91,10 @@ export class DeviceBridge {
   private heartbeatTimer: NodeJS.Timeout | null = null
   private syncTimer: NodeJS.Timeout | null = null
   private abortCurrent = false
+  /** The owner used the mouse or keyboard during an action: hands off until this time. */
+  private pausedUntil = 0
+  private takenOver = false
+  private watchStartedAt = 0
 
   constructor(private host: BridgeHost) {
     const idFile = path.join(app.getPath('userData'), 'device-id')
@@ -103,6 +107,35 @@ export class DeviceBridge {
     }
     this.deviceId = id
     this.policy.onChange = () => { this.emit(); this.scheduleSync() }
+    nativeHost.on('human_input', () => this.onHumanInput())
+  }
+
+  /** The owner took the mouse or keyboard: stop the action at once and wait until they're done. */
+  private onHumanInput() {
+    // Their own "Allow" click on the consent panel lands just as the action starts.
+    if (Date.now() - this.watchStartedAt < 600) return
+    this.pausedUntil = Date.now() + IDLE_BEFORE_RESUME
+    if (this.current && !this.takenOver) {
+      this.takenOver = true
+      nativeHost.stop()
+      this.host.showOverlay(this.current.employee, 'Paused — you’re using the PC', 'hsl(40 100% 77%)')
+    }
+  }
+
+  private async watchInput(on: boolean) {
+    if (!nativeHost.available) return
+    if (on) this.watchStartedAt = Date.now()
+    await nativeHost.call('watch', { on }, 5_000).catch(() => undefined)
+  }
+
+  /** Before the next action: wait (bounded) until the owner has left the mouse and keyboard alone. */
+  private async waitForIdle(command: DeviceCommand) {
+    if (Date.now() >= this.pausedUntil) return
+    const deadline = Date.now() + 40_000
+    this.host.showOverlay(command.employeeName || 'Your employee', 'Waiting — you’re using the PC', 'hsl(40 100% 77%)')
+    await this.watchInput(true)
+    while (Date.now() < this.pausedUntil && Date.now() < deadline && !this.abortCurrent) await sleep(250)
+    await this.watchInput(false)
   }
 
   get isRunning() { return this.current !== null }
@@ -248,11 +281,23 @@ export class DeviceBridge {
     }
 
     const tint = command.employeeId ? hueFor(command.employeeId) : 'hsl(224 100% 81%)'
+    const drives = scope === 'control' || scope === 'apps' || scope === 'office'
+    if (drives) await this.waitForIdle(command)
+    if (Date.now() < this.pausedUntil) {
+      return this.finish(action, 'failed', { ok: false, summary: 'You’re still using the PC, so I didn’t act. I’ll try again when you’re done.', data: { code: 'owner_busy' } })
+    }
     const visible = scope !== 'observe' && scope !== 'clipboard'
     if (visible) this.host.showOverlay(command.employeeName, action.summary, tint)
     if (command.operation === 'notify') this.host.showOverlay(command.employeeName, String(command.arguments.text ?? 'Heads up'), 'hsl(158 58% 68%)')
     void this.report(command.id, 'running', action.summary, {})
+    this.takenOver = false
+    if (drives) await this.watchInput(true)
     const result = await this.executor.run(command, scope)
+    if (drives) await this.watchInput(false)
+    if (this.takenOver) {
+      this.host.hideOverlay(2500)
+      return this.finish(action, 'failed', { ok: false, summary: 'Stopped: you took over the mouse or keyboard. Look at the screen again before continuing.', data: { code: 'owner_took_over' } })
+    }
     if (visible || command.operation === 'notify') this.host.hideOverlay(command.operation === 'notify' ? 5000 : 1400)
     if (this.abortCurrent) return this.finish(action, 'failed', { ok: false, summary: 'Stopped by the owner.' })
     action = { ...action }
@@ -281,5 +326,8 @@ export class DeviceBridge {
     })
   }
 }
+
+/** How long the owner must leave the mouse and keyboard alone before an employee acts again. */
+const IDLE_BEFORE_RESUME = 8_000
 
 function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)) }

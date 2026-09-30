@@ -54,9 +54,12 @@ public static class Program
             if (request is null) continue;
             var method = request["method"]?.GetValue<string>();
             if (method == "ping") { Reply(request, new { version = Version, pid = Environment.ProcessId }); continue; }
+            // Answered at once, even while a long action is running.
+            if (method == "watch") { Handle(request); continue; }
             queue.Add(request);
         }
         queue.CompleteAdding();
+        Watcher.Stop();
         return 0;
     }
 
@@ -84,6 +87,7 @@ public static class Program
         }
         finally
         {
+            if (Input.Acting) Watcher.ResetAnchor();
             Input.Acting = false;
         }
     }
@@ -182,6 +186,9 @@ public static class Program
             case "input.mouse_down": Input.Acting = true; Input.MouseButton(a.Str("button") ?? "left", false); return new { };
             case "input.mouse_up": Input.Acting = true; Input.MouseButton(a.Str("button") ?? "left", true); return new { };
             case "input.release": Input.ReleaseModifiers(); return new { };
+            case "wait": return Waits.Wait(a);
+            case "stable": return new { stable = Waits.Stable(a.Int("quiet", 400), a.Int("max", 2500)) };
+            case "watch": return Watcher.Configure(a);
             case "cursor": { Native.GetCursorPos(out var p); return new { x = p.X, y = p.Y }; }
             default: throw new HostError($"Unknown method '{method}'.", "invalid_input");
         }

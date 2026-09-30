@@ -110,6 +110,19 @@ public static class SelfTest
             if (r["changed"]?.GetValue<bool>() != true) throw new Exception("typing did not register as a change");
             return "changed=true after typing";
         });
+        Test("wait_for element and stable", () =>
+        {
+            var w = Call("wait", new { until = "element", text = "Text Editor", timeout = 5 })!;
+            if (w["ok"]?.GetValue<bool>() != true) throw new Exception(w["summary"]!.GetValue<string>());
+            var s = Call("stable", new { quiet = 300, max = 3000 })!;
+            return $"{w["summary"]} stable={s["stable"]}";
+        });
+        Test("wait_for times out cleanly", () =>
+        {
+            var w = Call("wait", new { until = "window", text = "No Such Window 42", timeout = 1 })!;
+            if (w["ok"]!.GetValue<bool>()) throw new Exception("found a window that doesn't exist");
+            return w["summary"]!.GetValue<string>();
+        });
         Test("keys + clipboard shortcut", () => { Call("input.keys", new { keys = "ctrl+a ctrl+c" }); return "sent"; });
         Test("focused element", () => { var f = Call("ui.focused")!["element"]; return $"{f?["role"]} '{f?["name"]}'"; });
         Test("click in image space", () =>
