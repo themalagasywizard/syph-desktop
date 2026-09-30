@@ -15,6 +15,11 @@ public static class Office
 
     private const int MaxCells = 20_000;
 
+    /// <summary>A parameterized COM property (Range, Cells, Resize, Address): an explicit property get,
+    /// which Office's IDispatch always accepts, unlike a late-bound method call.</summary>
+    private static dynamic Prop(object target, string name, params object[] args) =>
+        target.GetType().InvokeMember(name, System.Reflection.BindingFlags.GetProperty, null, target, args)!;
+
     private static dynamic App(string progId, string name, bool create)
     {
         if (CLSIDFromProgID(progId, out var clsid) != 0)
@@ -104,13 +109,13 @@ public static class Office
     {
         dynamic wb = Workbook(a);
         dynamic ws = Sheet(wb, a);
-        dynamic range = a.Str("range") is string r ? ws.Range(r) : ws.UsedRange;
+        dynamic range = a.Str("range") is string r ? Prop(ws, "Range", r) : ws.UsedRange;
         int rows = range.Rows.Count, cols = range.Columns.Count;
         var truncated = false;
         if ((long)rows * cols > MaxCells)
         {
             rows = Math.Max(1, MaxCells / Math.Max(1, cols));
-            range = range.Resize(rows, cols);
+            range = Prop(range, "Resize", rows, cols);
             truncated = true;
         }
         object raw = a.Bool("formulas", false) ? range.Formula : range.Value2;
@@ -131,7 +136,7 @@ public static class Office
         {
             ok = true,
             summary = $"Read {data.Count} rows × {cols} columns from {(string)ws.Name}{(truncated ? " (first part only)" : "")}.",
-            data = new { workbook = (string)wb.Name, sheet = (string)ws.Name, address = (string)range.Address(false, false), rows = data, truncated },
+            data = new { workbook = (string)wb.Name, sheet = (string)ws.Name, address = (string)Prop(range, "Address", false, false), rows = data, truncated },
         };
     }
 
@@ -158,16 +163,16 @@ public static class Office
                     _ => node.ToJsonString(),
                 };
             }
-        dynamic start = ws.Range(a.Str("range") ?? "A1");
-        dynamic target = start.Cells(1, 1).Resize(nr, nc);
+        dynamic start = Prop(ws, "Range", a.Str("range") ?? "A1");
+        dynamic target = Prop(Prop(start, "Cells", 1, 1), "Resize", nr, nc);
         // Formula accepts both values and "=..." formulas in one assignment.
         target.Formula = grid;
         if (a.Bool("autofit", true)) target.Columns.AutoFit();
         return new
         {
             ok = true,
-            summary = $"Wrote {nr} rows × {nc} columns to {(string)ws.Name}!{(string)target.Address(false, false)} (not saved yet).",
-            data = new { workbook = (string)wb.Name, sheet = (string)ws.Name, address = (string)target.Address(false, false) },
+            summary = $"Wrote {nr} rows × {nc} columns to {(string)ws.Name}!{(string)Prop(target, "Address", false, false)} (not saved yet).",
+            data = new { workbook = (string)wb.Name, sheet = (string)ws.Name, address = (string)Prop(target, "Address", false, false) },
         };
     }
 

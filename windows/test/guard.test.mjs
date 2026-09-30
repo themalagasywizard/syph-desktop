@@ -4,13 +4,14 @@ import { build } from 'esbuild'
 import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'syph-guard-')), 'guard.cjs')
 await build({
-  entryPoints: [new URL('../src/main/guard.ts', import.meta.url).pathname], bundle: true, platform: 'node', format: 'cjs',
-  outfile: out, alias: { electron: new URL('./electron-stub.cjs', import.meta.url).pathname }, logLevel: 'silent',
+  entryPoints: [fileURLToPath(new URL('../src/main/guard.ts', import.meta.url))], bundle: true, platform: 'node', format: 'cjs',
+  outfile: out, alias: { electron: fileURLToPath(new URL('../test-support/electron-stub.cjs', import.meta.url)) }, logLevel: 'silent',
 })
-const { Guard } = await import(out)
+const { Guard } = await import(pathToFileURL(out).href)
 
 const targets = { 7: { name: 'Pay now', role: 'Button' }, 8: { name: 'Sign in', role: 'Button' }, 9: { name: 'Password', password: true },
   10: { name: 'Accept cookies', role: 'Button' }, 11: { name: 'Delete invoice', role: 'Button' } }
