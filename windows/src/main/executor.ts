@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { DeviceCommand } from '../shared/types'
 import type { Scope } from '../shared/types'
+import type { GuardLookups } from './guard'
 import { SyphBrowser } from './browser'
 import type { Policy } from './policy'
 import { host, type HostCallError } from './host'
@@ -68,6 +69,14 @@ export class Executor {
 
   constructor(private policy: Policy) {
     this.browser = new SyphBrowser(() => this.policy.state.sharedFolders.find((f) => fs.existsSync(f)) ?? null)
+  }
+
+  /** What the risk guard needs to know about a target, answered by the helper and the browser. */
+  readonly lookups: GuardLookups = {
+    element: async (id) => host.available ? (await host.call('ui.describe', { id }, 5_000)).element : null,
+    at: async (x, y, space) => host.available ? (await host.call('ui.at', { x, y, space }, 5_000)).element : null,
+    focused: async () => host.available ? (await host.call('ui.focused', {}, 5_000)).element : null,
+    browserRef: async (ref) => await this.browser.describeRef(ref),
   }
 
   /** Operations beyond the original set that this PC can run right now; reported to the server. */

@@ -159,10 +159,15 @@ export function ConsentPanel() {
         <div className="t-caption c3" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {meta && <meta.icon size={12} />}Scope: {meta?.title ?? request.scope}
         </div>
+        {request.risky && (
+          <div className="t-caption" style={{ color: palette.amber }}>
+            This can’t be undone, so Syph asks every time.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-ghost" style={{ color: palette.coral }} onClick={() => decide('deny')}>Decline</button>
           <span style={{ flex: 1 }} />
-          <button className="btn-ghost" onClick={() => decide('always')}>Always allow</button>
+          {!request.risky && <button className="btn-ghost" onClick={() => decide('always')}>Always allow</button>}
           <button className="btn-signal" autoFocus onClick={() => decide('once')}>Allow once</button>
         </div>
       </div>

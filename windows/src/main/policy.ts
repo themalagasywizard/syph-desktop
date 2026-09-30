@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -34,28 +34,52 @@ export function scopeFor(operation: string): Scope | null {
 /** Reading operations that may reach outside the shared folders, with the argument holding the path. */
 const OUTSIDE_READS: Record<string, string> = { read_file: 'path', list_files: 'path', excel_read: 'path', word_read: 'path' }
 
-/** The owner's local choices, persisted on this PC only. */
+/**
+ * The owner's local choices, persisted on this PC only.
+ *
+ * Stored encrypted with the OS keystore (DPAPI), so an employee running
+ * PowerShell as the owner cannot rewrite its own permissions in a text file.
+ * A missing or unreadable file means the safe defaults (control off). CI may
+ * provide a plain computer.json by setting SYPH_ALLOW_PLAIN_POLICY=1.
+ */
 export class Policy {
   state: PolicyState
   onChange: (() => void) | null = null
+  private loaded = false
 
-  private get file() { return path.join(app.getPath('userData'), 'computer.json') }
+  private get dir() { return app.getPath('userData') }
+  private get file() { return path.join(this.dir, 'computer.bin') }
+  private get plainFile() { return path.join(this.dir, 'computer.json') }
 
   constructor() {
-    const fallback: PolicyState = {
-      controlEnabled: false,
-      modes: { ...DEFAULT_MODES },
-      sharedFolders: [path.join(os.homedir(), 'Documents', 'Syph')],
-    }
+    this.state = Policy.defaults()
+  }
+
+  private static defaults(): PolicyState {
+    return { controlEnabled: false, modes: { ...DEFAULT_MODES }, sharedFolders: [path.join(os.homedir(), 'Documents', 'Syph')] }
+  }
+
+  /** Reads the saved choices; call once the app is ready (the keystore needs it). */
+  load() {
+    if (this.loaded) return
+    this.loaded = true
+    let saved: Partial<PolicyState> | null = null
     try {
-      const saved = JSON.parse(fs.readFileSync(this.file, 'utf8')) as Partial<PolicyState>
+      if (safeStorage.isEncryptionAvailable() && fs.existsSync(this.file)) {
+        saved = JSON.parse(safeStorage.decryptString(fs.readFileSync(this.file)))
+      } else if (process.env.SYPH_ALLOW_PLAIN_POLICY === '1' && fs.existsSync(this.plainFile)) {
+        saved = JSON.parse(fs.readFileSync(this.plainFile, 'utf8'))
+      }
+    } catch { saved = null /* tampered or unreadable: safe defaults */ }
+    // A leftover plain file is never trusted outside CI.
+    if (process.env.SYPH_ALLOW_PLAIN_POLICY !== '1') { try { fs.rmSync(this.plainFile, { force: true }) } catch { /* locked */ } }
+    const fallback = Policy.defaults()
+    if (saved) {
       this.state = {
         controlEnabled: !!saved.controlEnabled,
-        modes: { ...DEFAULT_MODES, ...(saved.modes ?? {}) },
-        sharedFolders: saved.sharedFolders?.length ? saved.sharedFolders : fallback.sharedFolders,
+        modes: { ...DEFAULT_MODES, ...Object.fromEntries(Object.entries(saved.modes ?? {}).filter(([k, v]) => SCOPES.includes(k as Scope) && ['off', 'ask', 'allow'].includes(String(v)))) } as Record<Scope, ScopeMode>,
+        sharedFolders: saved.sharedFolders?.length ? saved.sharedFolders.map(String) : fallback.sharedFolders,
       }
-    } catch {
-      this.state = fallback
     }
     for (const folder of this.state.sharedFolders) {
       try { fs.mkdirSync(folder, { recursive: true }) } catch { /* may be removable media */ }
@@ -64,8 +88,11 @@ export class Policy {
 
   private save() {
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true })
-      fs.writeFileSync(this.file, JSON.stringify(this.state, null, 2))
+      if (safeStorage.isEncryptionAvailable()) {
+        fs.mkdirSync(this.dir, { recursive: true })
+        fs.writeFileSync(this.file, safeStorage.encryptString(JSON.stringify(this.state)))
+      }
+      // Without a keystore the choices last until Syph quits, rather than being stored in the clear.
     } catch { /* best effort */ }
     this.onChange?.()
   }
@@ -95,7 +122,10 @@ export class Policy {
     if (shared) return shared
     if (!outsideAllowed || typeof raw !== 'string' || this.isForbidden(raw)) return null
     const p = path.resolve(raw.trim().replace(/^~(?=$|[\\/])/, os.homedir()))
-    try { return fs.realpathSync.native(p) } catch { return null }
+    let real: string
+    try { real = fs.realpathSync.native(p) } catch { return null }
+    // Check where links really lead, not just what they are called.
+    return this.isForbidden(real) ? null : real
   }
 
   mode(scope: Scope): ScopeMode { return this.state.modes[scope] ?? DEFAULT_MODES[scope] }

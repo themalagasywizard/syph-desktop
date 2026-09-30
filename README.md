@@ -13,10 +13,10 @@ shortcut away.
 | Build | `open mac/Syph-Mac.xcodeproj` | `cd windows && npm install && npm run dist` |
 | Command bar | ⌥Space | Alt+Space |
 | Kill switch | ⌃⌥⌘. | Ctrl+Alt+. |
-| Screen reading | ScreenCaptureKit + Vision OCR | GDI + Windows OCR |
-| Controls | Accessibility API | UI Automation |
+| Screen reading | ScreenCaptureKit + Vision OCR | SyphHost: capture + Windows OCR + numbered snapshots the model sees |
+| Controls | Accessibility API | UI Automation (stable element ids), SendInput, browser + Office automation |
 | Shell | zsh + AppleScript | PowerShell |
-| Verified | CI build, screenshots, 16/16 end-to-end on a real Mac | Builds; screens rendered from demo data; not yet run on Windows |
+| Verified | CI build, screenshots, 16/16 end-to-end on a real Mac | CI on windows-latest: native self-test, end-to-end device contract, screenshots |
 
 ## Shared behaviour
 

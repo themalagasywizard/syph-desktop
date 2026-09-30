@@ -244,6 +244,7 @@ app.on('second-instance', () => showMain())
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
+  bridge.policy.load()
   if (automation.server) api.server = automation.server
   if (launch.demo) {
     bridge.policy.onChange = null

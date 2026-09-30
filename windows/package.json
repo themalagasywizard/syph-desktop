@@ -13,9 +13,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && node scripts/check-scopes.mjs",
     "dev:web": "vite",
     "start": "npm run build && electron .",
-    "dist": "npm run build && npm run build:host && electron-builder --win portable --x64",
+    "dist": "npm run build && npm run build:host && electron-builder --win nsis portable --x64",
     "shots": "node scripts/screenshots.mjs",
-    "build:host": "dotnet publish host/SyphHost.csproj -c Release -r win-x64 --self-contained true -o host/publish -nologo"
+    "build:host": "dotnet publish host/SyphHost.csproj -c Release -r win-x64 --self-contained true -o host/publish -nologo",
+    "test": "node --test test/"
   },
   "build": {
     "appId": "com.syph.desktop",
@@ -49,6 +50,7 @@
       "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
+        "nsis",
         "portable"
       ]
     },
@@ -61,7 +63,9 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "shortcutName": "Syph"
+      "shortcutName": "Syph",
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
     },
     "asarUnpack": [
       "node_modules/playwright-core/**"

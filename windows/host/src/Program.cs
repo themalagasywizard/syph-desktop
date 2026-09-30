@@ -134,6 +134,11 @@ public static class Program
                 var text = Uia.Text(id, a.Int("max", 200_000));
                 return new { text, length = text.Length };
             }
+            case "ui.describe":
+            {
+                var id = a.IntOrNull("id") ?? throw new HostError("ui.describe needs an element id.", "invalid_input");
+                return new { element = Wire(Uia.Refresh(id)) };
+            }
             case "ui.focused": return new { element = Uia.Focused() is { } f ? Wire(f) : null };
             case "ui.at":
             {

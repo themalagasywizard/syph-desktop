@@ -90,6 +90,8 @@ export interface BridgeState {
 
 export interface ConsentRequest {
   id: string; employee: string; scope: Scope; operation: string; headline: string; detail: string; deadline: number
+  /** A committing action (pay, send, delete, system change): asked every time, never "always". */
+  risky?: boolean
 }
 export type ConsentDecision = 'once' | 'always' | 'deny'
 

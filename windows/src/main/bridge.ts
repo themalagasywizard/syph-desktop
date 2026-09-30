@@ -8,6 +8,7 @@ import type {
 } from '../shared/types'
 import { api } from './api'
 import { Executor, type ExecutionResult } from './executor'
+import { Guard } from './guard'
 import { host as nativeHost } from './host'
 import { Policy } from './policy'
 
@@ -82,6 +83,7 @@ export class DeviceBridge {
   readonly policy = new Policy()
   readonly deviceId: string
   private executor = new Executor(this.policy)
+  private guard = new Guard(this.executor.lookups)
   private link: LinkState = 'idle'
   private linkError = ''
   private current: LocalAction | null = null
@@ -268,13 +270,17 @@ export class DeviceBridge {
     if (!scope) return this.finish(action, 'failed', { ok: false, summary: command.operation === 'applescript' ? 'AppleScript only runs on a Mac.' : `Unknown operation ${command.operation}.` })
     const mode = this.policy.mode(scope)
     if (mode === 'off') return this.finish(action, 'denied', { ok: false, summary: `'${SCOPE_TITLES[scope]}' is switched off on this PC.` })
-    if (mode === 'ask') {
+    // Committing actions are confirmed every time, whatever the scope says; some are never done.
+    const risk = await this.guard.assess(command)
+    if (risk?.level === 'block') return this.finish(action, 'denied', { ok: false, summary: risk.reason, data: { code: 'blocked' } })
+    if (mode === 'ask' || risk) {
       const decision = await this.host.askConsent({
         id: command.id, employee: command.employeeName || 'An employee', scope, operation: command.operation,
-        headline: headline(command), detail: detail(command), deadline: Date.now() + 60_000,
+        headline: risk ? `${headline(command)} — ${risk.reason}` : headline(command), detail: detail(command),
+        deadline: Date.now() + 60_000, risky: !!risk,
       })
       if (decision === 'deny') return this.finish(action, 'denied', { ok: false, summary: 'You declined on your PC.' })
-      if (decision === 'always') this.policy.setMode(scope, 'allow')
+      if (decision === 'always' && !risk) this.policy.setMode(scope, 'allow')
     }
     if (this.abortCurrent || !this.policy.state.controlEnabled) {
       return this.finish(action, 'denied', { ok: false, summary: 'Computer control was switched off.' })

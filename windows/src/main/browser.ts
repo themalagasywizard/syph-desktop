@@ -268,6 +268,17 @@ export class SyphBrowser {
     }
   }
 
+  /** Name and secrecy of a page element, for the risk guard. */
+  async describeRef(ref: number): Promise<{ name: string; secret: boolean } | null> {
+    if (!this.current || this.current.isClosed()) return null
+    return await this.locator(this.current, ref).evaluate((el: any) => {
+      const type = String(el.getAttribute('type') || '').toLowerCase()
+      const auto = String(el.getAttribute('autocomplete') || '')
+      const name = String(el.getAttribute('aria-label') || el.innerText || el.value || el.getAttribute('title') || '').trim().slice(0, 120)
+      return { name, secret: type === 'password' || /card|cvc|cvv|iban|otp|one-time/i.test(auto) }
+    }, undefined, { timeout: 2_000 }).catch(() => null)
+  }
+
   async close() {
     const ctx = this.context
     this.context = null

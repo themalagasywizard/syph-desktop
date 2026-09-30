@@ -40,9 +40,11 @@ jobs:
       - name: Install
         working-directory: windows
         run: npm ci
-      - name: Typecheck
+      - name: Typecheck and unit tests
         working-directory: windows
-        run: npm run typecheck
+        run: |
+          npm run typecheck
+          npm test
       - name: Build native helper (SyphHost.exe)
         working-directory: windows
         run: |
@@ -55,11 +57,29 @@ jobs:
           $p = Start-Process host\publish\SyphHost.exe -ArgumentList '--selftest', '--out', '..\shots\host-selftest.json' -PassThru -Wait -NoNewWindow
           Get-Content ..\shots\host-selftest.json
           if ($p.ExitCode -ne 0) { Write-Error "host self-test failed"; exit 1 }
-      - name: Build (unpacked + portable)
+      - name: Sign native helper (when a certificate is configured)
         working-directory: windows
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          if (-not $env:CSC_LINK) { Write-Host "No WINDOWS_CSC_LINK secret: building unsigned."; exit 0 }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:CSC_LINK))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:CSC_KEY_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 host\publish\SyphHost.exe
+          Remove-Item "$env:RUNNER_TEMP\cert.pfx"
+      - name: Build (unpacked, installer, portable)
+        working-directory: windows
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: |
           npm run build
-          npx electron-builder --win dir portable --x64 --publish never
+          # Signing (and resource editing by electron-builder) only when a certificate exists;
+          # otherwise afterPack stamps the icon and version with resedit.
+          $sign = if ($env:CSC_LINK) { '-c.win.signAndEditExecutable=true' } else { '-c.win.signAndEditExecutable=false' }
+          if (-not $env:CSC_LINK) { Remove-Item Env:CSC_LINK, Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue }
+          npx electron-builder --win dir nsis portable --x64 --publish never $sign
           Get-ChildItem release | Format-Table Name, Length
       - name: Screenshots (demo fixture)
         working-directory: windows
@@ -79,6 +99,7 @@ jobs:
           }
           New-Item -ItemType Directory -Force shots | Out-Null
           $env:SYPH_PLATFORM = 'windows'
+          $env:SYPH_ALLOW_PLAIN_POLICY = '1'
           $harness = Start-Process python -ArgumentList 'ci/device_contract_e2e.py' -RedirectStandardOutput e2e.log -RedirectStandardError e2e.err -PassThru -NoNewWindow
           Start-Sleep 2
           $app = Start-Process 'windows\release\win-unpacked\Syph.exe' -ArgumentList '--server=http://127.0.0.1:8765', '--email=ryan@jarvis.local', '--password=e2e', '--section=computer' -PassThru
@@ -100,6 +121,7 @@ jobs:
           SYPH_EVAL_OUT: ${{ github.workspace }}\shots\agent-eval
         run: |
           if (-not $env:SYPH_SERVER) { Write-Error "Set the SYPH_EVAL_SERVER, SYPH_EVAL_EMAIL, SYPH_EVAL_PASSWORD and SYPH_EVAL_EMPLOYEE secrets."; exit 1 }
+          $env:SYPH_ALLOW_PLAIN_POLICY = '1'
           $app = Start-Process 'windows\release\win-unpacked\Syph.exe' -ArgumentList "--server=$env:SYPH_SERVER", "--email=$env:SYPH_EMAIL", "--password=$env:SYPH_PASSWORD", '--section=computer' -PassThru
           Start-Sleep 30
           python ci/agent_eval.py
@@ -117,5 +139,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Syph-Windows-portable
-          path: windows/release/*.exe
+          name: Syph-Windows
+          path: |
+            windows/release/*.exe
+            !windows/release/win-unpacked/**

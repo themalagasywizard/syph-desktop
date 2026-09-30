@@ -64,6 +64,11 @@ public static class Apps
         }
         else
         {
+            // Only a bare program name ("excel", "notepad"), never a path or a script: launching
+            // arbitrary executables is what the shell scope (and its consent) is for.
+            if (query.IndexOfAny(['\\', '/', ':', ' ', '"', '&', '|', '>', '<']) >= 0
+                || System.Text.RegularExpressions.Regex.IsMatch(query, @"\.(bat|cmd|ps1|vbs|js|jse|wsf|hta|msi|scr|lnk)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                throw new HostError($"'{query}' isn't an app in Start. open_app takes an app name; running a file needs run_shell.", "not_found");
             try { Process.Start(new ProcessStartInfo(query) { UseShellExecute = true }); }
             catch (Exception e) { throw new HostError($"'{query}' isn't an app in Start and Windows couldn't run it ({e.Message}).", "not_found"); }
             launched = query;
