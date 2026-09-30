@@ -8,6 +8,8 @@ enum DemoMode {
     static var isOn: Bool { UserDefaults.standard.bool(forKey: "SyphDemo") }
     static var section: AppSection? { UserDefaults.standard.string(forKey: "SyphSection").flatMap(AppSection.init(rawValue:)) }
     static var showConsent: Bool { UserDefaults.standard.bool(forKey: "SyphDemoConsent") }
+    /// `-SyphWidget collapsed|expanded` shows the desktop widget.
+    static var widget: String? { UserDefaults.standard.string(forKey: "SyphWidget") }
 
     static func payload() -> WorkspacePayload? {
         try? JSONDecoder().decode(WorkspacePayload.self, from: Data(fixture.utf8))
@@ -124,6 +126,31 @@ extension AppModel {
         policy.onChange = nil  // no network in demo mode
         policy.controlEnabled = true
         bridge.link = .online
+        if let mode = DemoMode.widget {
+            store.working["e1"] = DemoMode.working
+            widget.employeeID = "e1"
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                widget.show(expand: mode == "expanded")
+                #if DEBUG
+                // -SyphWidgetShots <dir>: collapsed, opening (mid-animation) and open frames.
+                if let dir = UserDefaults.standard.string(forKey: "SyphWidgetShots") {
+                    widget.collapse()
+                    try? await Task.sleep(for: .milliseconds(700))
+                    widget.snapshot(to: "\(dir)/widget-collapsed.png")
+                    widget.expand()
+                    try? await Task.sleep(for: .milliseconds(160))
+                    widget.snapshot(to: "\(dir)/widget-opening.png")
+                    try? await Task.sleep(for: .milliseconds(1400))
+                    widget.snapshot(to: "\(dir)/widget-open.png")
+                    widget.draft = ""
+                    widget.employeeID = "e2"
+                    try? await Task.sleep(for: .milliseconds(900))
+                    widget.snapshot(to: "\(dir)/widget-empty.png")
+                }
+                #endif
+            }
+        }
         if DemoMode.showConsent,
            let command = try? JSONDecoder().decode(DeviceCommand.self, from: Data(DemoMode.commandJSON.utf8)) {
             bridge.overlay.show(employee: "Atlas", activity: "Reading the shipping sheet in Numbers", tint: Palette.hue(for: "e1"))

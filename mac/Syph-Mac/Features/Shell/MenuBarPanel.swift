@@ -12,6 +12,11 @@ struct MenuBarPanel: View {
             HStack {
                 Wordmark(size: 10)
                 Spacer()
+                Button { app.widget.isVisible ? app.widget.hide() : app.widget.show(expand: true) } label: {
+                    Text(app.widget.isVisible ? "Hide widget" : "Widget").font(Typo.caption)
+                }
+                .buttonStyle(GhostButtonStyle(compact: true))
+                .help("The Syph orb on your desktop (⌥⇧Space)")
                 Button { open(.chat) } label: { Text("Open").font(Typo.caption) }
                     .buttonStyle(GhostButtonStyle(compact: true))
             }

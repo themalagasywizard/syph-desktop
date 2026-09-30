@@ -50,6 +50,7 @@ jobs:
             shoot "$section" -SyphSection "$section"
           done
           shoot consent -SyphSection computer -SyphDemoConsent YES
+          shoot widget -SyphSection chat -SyphWidget expanded
           ls -la shots
       - name: End-to-end computer control (device contract)
         run: |

@@ -46,6 +46,10 @@ final class AppModel {
     let store: WorkspaceStore
     let policy = ComputerPolicy()
     let bridge: DeviceBridge
+    /// The orb on the desktop that opens into a small chat.
+    let widget = DesktopWidget()
+    /// Opens the main window scene; set by a view that has SwiftUI's openWindow.
+    @ObservationIgnored var openMainWindow: (() -> Void)?
 
     var section: AppSection = .chat
     var showHire = false
@@ -60,6 +64,7 @@ final class AppModel {
         store = WorkspaceStore(api: api)
         bridge = DeviceBridge(api: api, policy: policy)
         store.onRefresh = { [weak self] in self?.workspaceRefreshed() }
+        widget.app = self
     }
 
     func launch() async {
@@ -80,6 +85,11 @@ final class AppModel {
         #endif
         await store.restore()
         if store.phase == .ready { bridge.start() }
+        if store.phase == .ready && widget.startsInWidget {
+            widget.enterFromApp()
+        } else {
+            widget.restore()
+        }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
@@ -95,7 +105,19 @@ final class AppModel {
     func go(_ section: AppSection) {
         withAnimation(Motion.snappy) { self.section = section }
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first { $0.identifier?.rawValue.contains("main") == true }?.makeKeyAndOrderFront(nil)
+        if let window = mainWindow { window.makeKeyAndOrderFront(nil) } else { openMainWindow?() }
+    }
+
+    private var mainWindow: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue.contains("main") == true } }
+
+    /// From the widget: the full app, in front.
+    func showMainWindow(section: AppSection) {
+        go(section)
+    }
+
+    /// Into widget mode: the main window steps aside (Syph keeps running in the menu bar).
+    func hideMainWindow() {
+        mainWindow?.orderOut(nil)
     }
 
     // MARK: Notifications

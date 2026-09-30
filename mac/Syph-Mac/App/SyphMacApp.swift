@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeyCenter.shared.register(key: HotKeyCenter.killSwitch.key, modifiers: HotKeyCenter.killSwitch.modifiers) {
             Task { @MainActor in AppModel.shared.bridge.emergencyStop() }
         }
+        HotKeyCenter.shared.register(key: HotKeyCenter.widget.key, modifiers: HotKeyCenter.widget.modifiers) {
+            Task { @MainActor in AppModel.shared.widget.toggle() }
+        }
     }
 
     /// Closing the window keeps Syph in the menu bar so employees can still reach this Mac.
@@ -64,6 +67,8 @@ struct SyphCommands: Commands {
         CommandMenu("Go") {
             Button("Command Bar") { app.toggleCommandBar() }
                 .keyboardShortcut("k", modifiers: [.command])
+            Button("Widget Mode") { app.widget.enterFromApp() }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
             Divider()
             ForEach(AppSection.allCases) { section in
                 Button(section.title) { app.go(section) }
@@ -86,6 +91,7 @@ struct SyphCommands: Commands {
 
 struct MenuBarLabel: View {
     let app: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let waiting = app.store.waitingApprovals.count
@@ -94,5 +100,7 @@ struct MenuBarLabel: View {
             Image(systemName: driving ? "circle.hexagongrid.circle.fill" : (waiting > 0 ? "circle.circle.fill" : "circle.circle"))
             if waiting > 0 { Text("\(waiting)") }
         }
+        // The menu bar label always exists, so it is where the widget gets a way to reopen the app.
+        .onAppear { app.openMainWindow = { openWindow(id: "main") } }
     }
 }

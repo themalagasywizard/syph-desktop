@@ -41,6 +41,7 @@ Developer ID and notarized, not through the Mac App Store.
 | Settings | Account, AI model provider/key/test, connected tools (Google connect opens the browser), shortcuts. |
 | Menu bar | Who is working, approve/decline, the computer-control switch. The app keeps running when the window closes. |
 | Command bar | **⌥Space** from any app: tell an employee what to do; ⇥ switches employee, ⌘↩ sends and opens the thread. Also ⌘K. |
+| Desktop widget | The Syph orb, anywhere on your desktop (drag it; it remembers where). Click it and it opens into a small chat with one employee — live steps, Stop, approvals, files as chips — without the main window and without taking focus from the app you're in. It tells the employee which app and window you're using (a chip you can switch off), so "fix this" works. ⇥ / ‹ › switch employee, ↩ sends, esc closes, ⌘O opens the full app on the same conversation. **⌥⇧Space** opens it from anywhere; **⇧⌘D** or the orb button in the sidebar turns the app into the widget; the menu bar has Widget / Hide widget; right-click the orb to start in widget mode. |
 
 ## Computer control
 

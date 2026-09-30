@@ -11,6 +11,8 @@ final class HotKeyCenter {
 
     /// ⌥Space summons the command bar.
     static let commandBar = (key: UInt32(kVK_Space), modifiers: UInt32(optionKey))
+    /// ⌥⇧Space opens or closes the desktop widget's chat.
+    static let widget = (key: UInt32(kVK_Space), modifiers: UInt32(optionKey | shiftKey))
     /// ⌃⌥⌘. stops whatever an employee is doing on this Mac.
     static let killSwitch = (key: UInt32(kVK_ANSI_Period), modifiers: UInt32(controlKey | optionKey | cmdKey))
 

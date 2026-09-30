@@ -82,6 +82,9 @@ struct Sidebar: View {
                     }
                 }
                 Spacer()
+                IconButton(symbol: "circle.circle", help: "Widget mode — keep Syph as an orb on your desktop (⇧⌘D)") {
+                    app.widget.enterFromApp()
+                }
                 ThemeButton()
                 IconButton(symbol: "slider.horizontal.3", help: "Settings") { app.go(.settings) }
             }
