@@ -95,7 +95,7 @@ function Hero() {
 
 function ReadinessStrip() {
   const items: [LucideIcon, string, string][] = [
-    [ScanText, 'On-device OCR', 'Screen text is read by Windows itself; no image leaves the PC.'],
+    [ScanText, 'Sees what you see', 'Screenshots go to your AI model only while an employee works here, with password fields blacked out first.'],
     [ShieldCheck, 'Runs as you', 'No admin rights. Elevated (UAC) windows stay out of reach.'],
     [Keyboard, 'Always stoppable', 'Stop in the top bar, the tray, or Ctrl+Alt+. from any app.'],
   ]
