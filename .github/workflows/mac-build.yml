@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "mac/**"
+      - "ci/**"
       - ".github/workflows/mac-build.yml"
   pull_request:
     paths:
       - "mac/**"
+      - "ci/**"
   workflow_dispatch:
 
 permissions:
@@ -55,7 +57,7 @@ jobs:
         run: |
           defaults write Ozyan.SyphMac syph.computer.enabled -bool YES
           defaults write Ozyan.SyphMac syph.computer.modes -dict observe allow screen allow control allow apps allow clipboard allow files_read allow files_write allow automation allow shell allow
-          python3 mac/CI/device_contract_e2e.py > e2e.log 2>&1 &
+          SYPH_PLATFORM=macos python3 ci/device_contract_e2e.py > e2e.log 2>&1 &
           HARNESS=$!
           sleep 2
           APP="build/Build/Products/Debug/Syph.app/Contents/MacOS/Syph"

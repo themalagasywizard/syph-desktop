@@ -88,7 +88,7 @@ CI (`.github/workflows/mac-build.yml`, macOS 15 runner, Xcode 26.3) on every pus
 2. **Screenshots** every section from a fixture (`-SyphDemo YES -SyphSection <name>`,
    `-SyphDemoConsent YES` for the consent panel and driving overlay). Manual
    runs commit them to [`docs/ui/mac/`](../docs/mac-screenshots/).
-3. **End-to-end computer control** (`CI/device_contract_e2e.py`): a stand-in
+3. **End-to-end computer control** (`../ci/device_contract_e2e.py`): a stand-in
    for the API speaks the device wire contract; the real app signs in through a
    DEBUG-only launch hook, links itself, and executes 16 real commands — files
    inside and outside shared folders, zsh, AppleScript, clipboard, open/quit
@@ -109,5 +109,5 @@ mac/
     Core/Design     tokens, components, AgentOrb, backdrop
     Computer/       DeviceBridge, policy, executor, OCR, input, AX, consent, overlay
     Features/       Chat, Team, Approvals, Work/Library, Computer, Settings, Shell
-  CI/device_contract_e2e.py        end-to-end harness used by CI
+  ../ci/device_contract_e2e.py     end-to-end harness used by CI (shared with Windows)
 ```

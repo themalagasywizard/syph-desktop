@@ -1,0 +1,83 @@
+name: Syph for Windows
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - "ci/**"
+      - ".github/workflows/windows-build.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "ci/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: windows
+        run: npm ci
+      - name: Typecheck
+        working-directory: windows
+        run: npm run typecheck
+      - name: Build (unpacked + portable)
+        working-directory: windows
+        run: |
+          npm run build
+          npx electron-builder --win dir portable --x64 --publish never
+          Get-ChildItem release | Format-Table Name, Length
+      - name: Screenshots (demo fixture)
+        working-directory: windows
+        env:
+          CHROMIUM: C:\Program Files\Google\Chrome\Application\chrome.exe
+        run: node scripts/screenshots.mjs ../shots
+      - name: End-to-end computer control (device contract)
+        run: |
+          # Allow every scope so the harness exercises each operation without a consent click.
+          $policy = @{ controlEnabled = $true; sharedFolders = @("$env:USERPROFILE\Documents\Syph")
+                       modes = @{ observe = 'allow'; screen = 'allow'; control = 'allow'; apps = 'allow'; clipboard = 'allow'
+                                  files_read = 'allow'; files_write = 'allow'; shell = 'allow' } } | ConvertTo-Json -Depth 4
+          foreach ($name in 'Syph', 'syph-windows') {
+            New-Item -ItemType Directory -Force "$env:APPDATA\$name" | Out-Null
+            Set-Content -Path "$env:APPDATA\$name\computer.json" -Value $policy -Encoding utf8
+          }
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $env:SYPH_PLATFORM = 'windows'
+          $harness = Start-Process python -ArgumentList 'ci/device_contract_e2e.py' -RedirectStandardOutput e2e.log -RedirectStandardError e2e.err -PassThru -NoNewWindow
+          Start-Sleep 2
+          $app = Start-Process 'windows\release\win-unpacked\Syph.exe' -ArgumentList '--server=http://127.0.0.1:8765', '--email=ryan@jarvis.local', '--password=e2e', '--section=computer' -PassThru
+          Start-Sleep 25
+          & ci\windows-screenshot.ps1 shots\e2e-live.png
+          $harness.WaitForExit(330000) | Out-Null
+          & ci\windows-screenshot.ps1 shots\e2e.png
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          Get-Content e2e.log
+          Get-Content e2e.err -ErrorAction SilentlyContinue
+          if ($harness.ExitCode -ne 0) { exit 1 }
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Syph-Windows-screenshots
+          path: shots
+      - name: Upload app
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Syph-Windows-portable
+          path: windows/release/*.exe

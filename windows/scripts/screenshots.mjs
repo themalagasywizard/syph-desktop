@@ -5,7 +5,8 @@ import fs from 'node:fs'
 
 const out = process.argv[2] ?? 'shots'
 fs.mkdirSync(out, { recursive: true })
-const server = spawn('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], { stdio: 'ignore' })
+// npx is a .cmd on Windows, which Node only spawns through a shell.
+const server = spawn('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], { stdio: 'ignore', shell: process.platform === 'win32' })
 await new Promise((r) => setTimeout(r, 2500))
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
 const page = await browser.newPage({ viewport: { width: 1320, height: 840 }, deviceScaleFactor: 1 })

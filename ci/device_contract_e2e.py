@@ -1,10 +1,12 @@
-"""End-to-end check of Syph for Mac's computer control on a real Mac.
+"""End-to-end check of Syph for Mac / Windows computer control on a real machine.
 
 A stdlib stand-in for the Syph API speaks the same wire contract as
 `services/api/app/devices.py` (auth, workspace, device register/heartbeat,
 long-poll, result). The real app signs in, links itself, and executes the
 queued commands for real; this script asserts on what it reports back.
 The server side of the contract is covered by the backend's test_devices.py.
+
+SYPH_PLATFORM=macos (default) or windows picks the platform's cases.
 """
 import json
 import socketserver
@@ -17,7 +19,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 MARKER = f"syph-e2e-{uuid.uuid4().hex[:8]}"
-CASES = [
+PLATFORM = os.environ.get("SYPH_PLATFORM", "macos").lower()
+
+MAC_CASES = [
     ("observe", {}, True),
     ("list_files", {}, True),
     ("write_file", {"path": "e2e/hello.txt", "content": MARKER}, True),
@@ -35,6 +39,27 @@ CASES = [
     ("read_ui", {}, None),      # needs Accessibility; reported either way
     ("trash_file", {"path": "e2e/hello.txt"}, True),
 ]
+
+WINDOWS_CASES = [
+    ("observe", {}, True),
+    ("list_files", {}, True),
+    ("write_file", {"path": "e2e/hello.txt", "content": MARKER}, True),
+    ("read_file", {"path": "e2e/hello.txt"}, True),
+    ("list_files", {"path": "e2e"}, True),
+    ("read_file", {"path": "C:\\Windows\\win.ini"}, False),  # outside shared folders: must be refused
+    ("run_shell", {"command": "Get-Content e2e\\hello.txt; 'shell-ok'"}, True),
+    ("applescript", {"script": "return 5"}, False),  # Mac only: refused with a pointer to PowerShell
+    ("clipboard_write", {"text": MARKER}, True),
+    ("clipboard_read", {}, True),
+    ("open_app", {"app": "Notepad"}, True),
+    ("read_screen", {}, True),
+    ("read_ui", {}, True),
+    ("quit_app", {"app": "Notepad"}, True),
+    ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
+    ("trash_file", {"path": "e2e/hello.txt"}, True),
+]
+
+CASES = WINDOWS_CASES if PLATFORM == "windows" else MAC_CASES
 
 lock = threading.Lock()
 queue = [
@@ -156,7 +181,7 @@ class Server(ThreadingHTTPServer):
 def main() -> int:
     server = Server(("127.0.0.1", int(os.environ.get("PORT", "8765"))), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print("mock API listening", flush=True)
+    print(f"mock API listening ({PLATFORM}, {len(queue)} cases)", flush=True)
     deadline = time.monotonic() + float(os.environ.get("E2E_TIMEOUT", "300"))
     while time.monotonic() < deadline and len(results) < len(queue):
         time.sleep(0.5)
@@ -174,7 +199,7 @@ def main() -> int:
         checks = {
             "read_file": lambda: MARKER in data.get("content", ""),
             "run_shell": lambda: "shell-ok" in data.get("stdout", "") and MARKER in data.get("stdout", ""),
-            "applescript": lambda: data.get("stdout", "").strip() == "5",
+            "applescript": lambda: PLATFORM != "macos" or data.get("stdout", "").strip() == "5",
             "clipboard_read": lambda: data.get("content") == MARKER,
         }
         if ok and cmd["operation"] in checks and not checks[cmd["operation"]]():
