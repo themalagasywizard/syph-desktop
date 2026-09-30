@@ -92,6 +92,24 @@ public static class SelfTest
                 throw new Exception($"OCR text: {text[..Math.Min(200, text.Length)]} {r["note"]}");
             return $"{r["lines"]!.AsArray().Count} lines";
         });
+        Test("snapshot with marks", () =>
+        {
+            var r = Call("snapshot", new { })!;
+            var bytes = Convert.FromBase64String(r["_image"]!.GetValue<string>()).Length;
+            var els = r["elements"]!.AsArray();
+            if (els.Count == 0) throw new Exception("no elements listed");
+            if (els.Any(e => e!["x"]!.GetValue<int>() < 0 || e["x"]!.GetValue<int>() > r["width"]!.GetValue<int>())) throw new Exception("element outside image");
+            return $"{r["width"]}x{r["height"]}, {els.Count} numbered controls, {bytes / 1024} KB, app={r["app"]}";
+        });
+        Test("snapshot notices change", () =>
+        {
+            Call("snapshot", new { });
+            Call("input.type", new { text = " more text" });
+            Thread.Sleep(250);
+            var r = Call("snapshot", new { })!;
+            if (r["changed"]?.GetValue<bool>() != true) throw new Exception("typing did not register as a change");
+            return "changed=true after typing";
+        });
         Test("keys + clipboard shortcut", () => { Call("input.keys", new { keys = "ctrl+a ctrl+c" }); return "sent"; });
         Test("focused element", () => { var f = Call("ui.focused")!["element"]; return $"{f?["role"]} '{f?["name"]}'"; });
         Test("click in image space", () =>

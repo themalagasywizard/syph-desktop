@@ -22,7 +22,16 @@ function num(command: DeviceCommand, key: string): number | undefined {
 }
 
 /** Operations that only exist with the native helper. */
-export const HOST_OPERATIONS = ['set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets'] as const
+export const HOST_OPERATIONS = ['snapshot', 'act', 'set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets'] as const
+
+/** Operations that change the screen; with observe they come back with a fresh snapshot. */
+const ACTING = new Set(['click', 'click_text', 'press', 'type_text', 'press_keys', 'scroll', 'set_value', 'drag', 'move', 'window', 'act', 'open_app', 'quit_app', 'open_url'])
+
+/** The model's view of a snapshot, without the image (which travels as _image). */
+function snapshotView(r: any): Record<string, unknown> {
+  const { _image, ...rest } = r
+  return rest
+}
 
 /** Arguments that describe a point: an element id, or x/y in screen or last-screenshot pixels. */
 function pointArgs(a: Record<string, unknown>, prefix = ''): Record<string, unknown> | undefined {
@@ -30,7 +39,7 @@ function pointArgs(a: Record<string, unknown>, prefix = ''): Record<string, unkn
   if (el !== undefined && el !== null && el !== '') return { element: Number(el) }
   const x = a[`${prefix}x`], y = a[`${prefix}y`]
   if (x === undefined || y === undefined || x === '' || y === '') return undefined
-  return { x: Number(x), y: Number(y), space: a.space === 'image' ? 'image' : 'screen' }
+  return { x: Number(x), y: Number(y), space: (a[`${prefix}space`] ?? a.space) === 'image' ? 'image' : 'screen' }
 }
 
 function describe(e: any): string {
@@ -69,10 +78,42 @@ export class Executor {
   }
 
   async run(command: DeviceCommand): Promise<ExecutionResult> {
+    const result = await this.perform(command)
+    if (command.arguments.observe === true && ACTING.has(command.operation) && host.available) {
+      return await this.withScreen(result)
+    }
+    return result
+  }
+
+  /** Adds the screen as it is after an action: the agent checks it instead of looking again. */
+  private async withScreen(result: ExecutionResult): Promise<ExecutionResult> {
+    await new Promise((r) => setTimeout(r, 350)) // let the app repaint
+    try {
+      const shot = await host.call('snapshot', {}, 30_000)
+      const view = snapshotView(shot)
+      const note = shot.changed === false ? ' The screen did not change.' : ''
+      return { ...result, summary: result.summary + note, data: { ...(result.data ?? {}), screen_after: view, _image: shot._image } }
+    } catch {
+      return result
+    }
+  }
+
+  private async perform(command: DeviceCommand): Promise<ExecutionResult> {
     const a = command.arguments
     const useHost = host.available
     try {
       switch (command.operation) {
+        case 'snapshot': {
+          if (!useHost) return this.needsHost('snapshot')
+          try {
+            const r = await host.call('snapshot', { monitor: a.monitor, window: str(command, 'window'), ocr: a.ocr === true, limit: num(command, 'limit') ?? 150 }, 60_000)
+            const where = r.app ? `${r.app}${r.window ? ` – ${r.window}` : ''}` : r.screen
+            return { ok: true, summary: `Snapshot of ${where}: ${r.elements.length} numbered controls${r.redacted ? `, ${r.redacted} password field(s) hidden` : ''}.`, data: { ...snapshotView(r), _image: r._image } }
+          } catch (e) {
+            return fail((e as Error).message, { code: (e as HostCallError).code ?? 'failed' })
+          }
+        }
+        case 'act': return await this.act(command)
         case 'observe':
           if (!useHost) return await runScript('observe', {})
           return await this.host('observe', {}, (r) => `${r.front?.app || 'Nothing'} is in front${r.front?.title ? ` (‘${r.front.title}’)` : ''}; ${r.windows.length} windows open.`, (r) => ({
@@ -193,6 +234,73 @@ export class Executor {
       }
     } catch (e) {
       return fail((e as Error).message)
+    }
+  }
+
+  /** Runs a short list of steps in order, stopping at the first that fails. */
+  private async act(command: DeviceCommand): Promise<ExecutionResult> {
+    if (!host.available) return this.needsHost('act')
+    const steps = Array.isArray(command.arguments.actions) ? (command.arguments.actions as Record<string, unknown>[]) : []
+    if (!steps.length) return fail('act needs actions: a list of steps.')
+    if (steps.length > 25) return fail('act takes at most 25 steps; split the work.')
+    const space = command.arguments.space === 'screen' ? 'screen' : 'image'
+    const done: Array<{ do: string; ok: boolean; summary: string }> = []
+    for (const [i, raw] of steps.entries()) {
+      const step = { space, ...raw } as Record<string, unknown>
+      const kind = String(step.do ?? step.action ?? step.type ?? '').toLowerCase()
+      let r: ExecutionResult
+      try {
+        r = await this.actStep(kind, step)
+      } catch (e) {
+        r = fail((e as Error).message)
+      }
+      done.push({ do: kind, ok: r.ok, summary: r.summary })
+      if (!r.ok) {
+        return fail(`Step ${i + 1} (${kind}) failed: ${r.summary}`, { steps: done, completed: i })
+      }
+    }
+    return { ok: true, summary: `Did ${done.length} step${done.length === 1 ? '' : 's'}: ${done.map((d) => d.do).join(', ')}.`, data: { steps: done } }
+  }
+
+  private async actStep(kind: string, s: Record<string, unknown>): Promise<ExecutionResult> {
+    const at = () => pointArgs(s)
+    switch (kind) {
+      case 'click': case 'double_click': case 'right_click': {
+        const p = at()
+        if (!p) return fail(`${kind} needs element or x/y.`)
+        const count = kind === 'double_click' ? 2 : Number(s.count ?? 1)
+        return await this.host('input.click', { ...p, count, button: kind === 'right_click' ? 'right' : String(s.button ?? 'left'), modifiers: s.modifiers }, (r) => `Clicked at ${r.x}, ${r.y}.`)
+      }
+      case 'type': case 'type_text': {
+        const text = String(s.text ?? '')
+        return await this.host('input.type', { text, element: s.element === undefined ? undefined : Number(s.element) }, () => `Typed ${text.length} characters.`)
+      }
+      case 'keys': case 'press_keys': case 'key':
+        return await this.host('input.keys', { keys: String(s.keys ?? s.key ?? ''), hold: s.hold }, () => `Pressed ${String(s.keys ?? s.key)}.`)
+      case 'set_value':
+        return await this.host('ui.act', { id: Number(s.element), action: 'set_value', value: String(s.value ?? s.text ?? '') }, (r) => `Set ${describe(r.element)}.`)
+      case 'press': case 'invoke':
+        if (s.element === undefined) return fail('press in act needs an element id.')
+        return await this.host('ui.act', { id: Number(s.element), action: 'invoke' }, (r) => `Pressed ${describe(r.element)}.`)
+      case 'scroll':
+        return await this.host('input.scroll', { direction: String(s.direction ?? 'down'), amount: Number(s.amount ?? 5), ...(at() ?? {}) }, () => `Scrolled ${String(s.direction ?? 'down')}.`)
+      case 'drag': {
+        const from = pointArgs(s, 'from_'), to = pointArgs(s, 'to_')
+        if (!from || !to) return fail('drag needs from_x/from_y (or from_element) and to_x/to_y (or to_element).')
+        return await this.host('input.drag', { from: { ...from, space: s.space }, to: { ...to, space: s.space } }, () => 'Dragged.')
+      }
+      case 'move': {
+        const p = at()
+        if (!p) return fail('move needs element or x/y.')
+        return await this.host('input.move', p, () => 'Moved the pointer.')
+      }
+      case 'wait': {
+        const seconds = Math.min(10, Math.max(0.1, Number(s.seconds ?? 1)))
+        await new Promise((r) => setTimeout(r, seconds * 1000))
+        return { ok: true, summary: `Waited ${seconds}s.` }
+      }
+      default:
+        return fail(`Unknown step '${kind}'. Use click, double_click, right_click, type, keys, set_value, press, scroll, drag, move or wait.`)
     }
   }
 

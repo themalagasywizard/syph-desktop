@@ -163,6 +163,7 @@ export class DeviceBridge {
   private async heartbeat() {
     const res = await api.request<DeviceRecord>('POST', `/api/v1/devices/${this.deviceId}/heartbeat`, {
       controlEnabled: this.policy.state.controlEnabled, scopes: this.policy.wireScopes(),
+      capabilities: this.executor.capabilities(),
     })
     if (res.ok) this.setLink('online')
     else if (res.status === 404) { try { await this.register() } catch { /* next beat */ } }

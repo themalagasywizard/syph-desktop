@@ -58,6 +58,9 @@ WINDOWS_CASES = [
     # Native helper operations (SyphHost.exe): element ids come from the read_ui above.
     ("read_text", lambda r: {"element": _text_area(r)}, True),
     ("set_value", lambda r: {"element": _text_area(r), "text": MARKER + " set"}, True),
+    ("snapshot", {}, True),
+    ("act", lambda r: {"actions": [{"do": "click", "element": _text_area(r)}, {"do": "keys", "keys": "ctrl+end"},
+                                   {"do": "type", "text": " act-ok"}], "observe": True}, True),
     ("list_windows", {}, True),
     ("window", {"action": "snap_left", "app": "Notepad"}, True),
     ("press_keys", {"keys": "ctrl+a delete"}, True),
@@ -214,7 +217,7 @@ def main() -> int:
             continue
         ok = got.get("status") == "succeeded"
         data = got.get("data") or {}
-        slim = {k: v for k, v in data.items() if k not in {"lines", "elements", "running_apps", "windows", "_image", "entries"}}
+        slim = {k: v for k, v in data.items() if k not in {"lines", "elements", "running_apps", "windows", "_image", "entries", "screen_after", "monitors"}}
         verdict = "ok" if cmd["expect"] is None or ok == cmd["expect"] else "UNEXPECTED"
         checks = {
             "read_file": lambda: MARKER in data.get("content", ""),
@@ -222,6 +225,8 @@ def main() -> int:
             "applescript": lambda: PLATFORM != "macos" or data.get("stdout", "").strip() == "5",
             "clipboard_read": lambda: data.get("content") == MARKER,
             "read_text": lambda: MARKER in data.get("content", "") and "héllo ✓" in data.get("content", ""),
+            "snapshot": lambda: len(data.get("elements") or []) > 0 and len(data.get("_image") or "") > 1000,
+            "act": lambda: len((data.get("screen_after") or {}).get("elements") or []) > 0 and bool(data.get("_image")),
         }
         if ok and cmd["operation"] in checks and not checks[cmd["operation"]]():
             verdict = "WRONG DATA"
@@ -229,6 +234,7 @@ def main() -> int:
             failures += 1
         extra = f" lines={len(data.get('lines', []))}" if "lines" in data else ""
         extra += f" elements={len(data.get('elements', []))}" if "elements" in data else ""
+        extra += f" image={len(data.get('_image', '')) // 1024}KB" if data.get("_image") else ""
         extra += f" thumbnail={'yes' if data.get('_image') else 'no'}" if cmd["operation"] == "read_screen" else ""
         print(f"[{verdict:10s}] {cmd['operation']:15s} {got.get('status'):9s} {got.get('summary', '')}{extra}  {json.dumps(slim)[:220]}")
     print(f"{len(queue) - failures}/{len(queue)} cases as expected", flush=True)
