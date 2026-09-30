@@ -254,6 +254,7 @@ public static class Uia
     public static Element Act(int id, string action, string? value)
     {
         var e = Get(id);
+        Guard.NotSyphProcess(e.CurrentProcessId);
         switch (action)
         {
             case "invoke":

@@ -134,6 +134,14 @@ public static class SelfTest
             var r = Call("input.click", new { x = ix, y = iy, space = "image" })!;
             return $"image ({ix:0},{iy:0}) -> screen ({r["x"]},{r["y"]})";
         });
+        Test("Syph's own windows are off-limits", () =>
+        {
+            // The self-test process stands in for Syph: its console window must refuse clicks.
+            var ok = true;
+            try { Guard.NotSyphProcess(Environment.ProcessId); ok = false; } catch (HostError) { }
+            if (!ok) throw new Exception("own process was not refused");
+            return "refused";
+        });
         Test("apps.quit notepad", () =>
         {
             var r = Call("apps.quit", new { app = "Notepad" })!;

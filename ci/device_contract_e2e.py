@@ -71,6 +71,9 @@ WINDOWS_CASES = [
     ("press_keys", {"keys": "ctrl+a delete"}, True),
     ("quit_app", {"app": "Notepad"}, None),  # classic Notepad may ask to save
     ("press", {"title": "Don't Save"}, None),
+    # Employees never operate Syph's own windows (its consent panel lives there).
+    ("window", {"action": "focus", "app": "Syph"}, None),
+    ("press_keys", {"keys": "tab"}, False),
     ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
     # Syph's own browser (Edge profile over the DevTools protocol)
     ("browser_open", {"url": "https://example.com"}, True, lambda d: "Example" in d.get("title", "") and bool(d.get("_image"))),
@@ -213,6 +216,8 @@ class Server(ThreadingHTTPServer):
 
 
 def main() -> int:
+    # The Windows runner's console is cp1252; results carry any language.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     server = Server(("127.0.0.1", int(os.environ.get("PORT", "8765"))), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"mock API listening ({PLATFORM}, {len(queue)} cases)", flush=True)

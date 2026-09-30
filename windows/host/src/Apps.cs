@@ -138,6 +138,27 @@ public static class Guard
 {
     private static readonly int AppPid = int.TryParse(Environment.GetEnvironmentVariable("SYPH_APP_PID"), out var p) ? p : -1;
 
+    /// <summary>Employees never click, type into or press anything in Syph's own windows:
+    /// that is where the owner's consent panel and kill switch live.</summary>
+    public static void NotSyphAt(int x, int y)
+    {
+        var h = Native.WindowFromPoint(new Native.POINT { X = x, Y = y });
+        if (h == IntPtr.Zero) return;
+        Native.GetWindowThreadProcessId(Native.GetAncestor(h, Native.GA_ROOTOWNER), out var pid);
+        if (IsSyph(pid)) throw new HostError("That point is on Syph's own window; employees can't click Syph. Bring the app you need to the front first.", "policy_denied");
+    }
+
+    public static void NotSyphInFront()
+    {
+        Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), out var pid);
+        if (IsSyph(pid)) throw new HostError("Syph is in front, so keys would go to Syph. Bring the app you need to the front first (window focus).", "policy_denied");
+    }
+
+    public static void NotSyphProcess(int pid)
+    {
+        if (IsSyph(pid)) throw new HostError("That control belongs to Syph; employees can't operate Syph itself.", "policy_denied");
+    }
+
     public static bool IsSyph(int pid)
     {
         if (pid == Environment.ProcessId || pid == AppPid) return true;

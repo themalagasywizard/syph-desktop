@@ -95,7 +95,7 @@ public static class WindowManager
     {
         if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
         if (GetForegroundWindow() == h) return true;
-        Input.Chords("alt", 0);
+        Input.TapAltForFocus();
         if (SetForegroundWindow(h) && WaitForeground(h)) return true;
         var fg = GetForegroundWindow();
         var fgThread = GetWindowThreadProcessId(fg, out _);

@@ -67,6 +67,7 @@ public static class Input
     public static void Click(int x, int y, string button = "left", int count = 1, IEnumerable<string>? modifiers = null)
     {
         var mods = (modifiers ?? []).Select(m => Keys.Resolve(m)).ToList();
+        Guard.NotSyphAt(x, y);
         MoveTo(x, y);
         foreach (var m in mods) Send(Key(m.Vk, false, m.Extended));
         try
@@ -89,6 +90,8 @@ public static class Input
     public static void Drag(int fromX, int fromY, int toX, int toY, string button = "left", int holdMs = 120)
     {
         var (down, up) = Buttons(button);
+        Guard.NotSyphAt(fromX, fromY);
+        Guard.NotSyphAt(toX, toY);
         MoveTo(fromX, fromY);
         Send(Mouse(down));
         try
@@ -137,6 +140,7 @@ public static class Input
     /// so multi-line text works in editors and forms alike.</summary>
     public static void Type(string text, int delayMs = 4)
     {
+        Guard.NotSyphInFront();
         var batch = new List<INPUT>();
         void Flush() { if (batch.Count > 0) { Send(batch.ToArray()); batch.Clear(); } }
         for (int i = 0; i < text.Length; i++)
@@ -162,6 +166,7 @@ public static class Input
     /// <summary>Presses one or more chords in sequence: "ctrl+s", "alt+f4", "ctrl+a delete", "win+r".</summary>
     public static void Chords(string spec, int holdMs = 0)
     {
+        Guard.NotSyphInFront();
         var chords = Keys.ParseSequence(spec);
         if (chords.Count == 0) throw new HostError($"'{spec}' isn't a key or shortcut this PC understands.", "invalid_input");
         foreach (var chord in chords)
@@ -175,7 +180,11 @@ public static class Input
         }
     }
 
-    public static void KeyDown(string spec) { foreach (var k in Keys.ParseChord(spec)) Send(Key(k.Vk, false, k.Extended)); }
+    /// <summary>The Alt tap Windows requires before it lets another window come forward
+    /// (internal to focusing; not typing into whatever is in front).</summary>
+    public static void TapAltForFocus() => Send(Key(0x12, false), Key(0x12, true));
+
+    public static void KeyDown(string spec) { Guard.NotSyphInFront(); foreach (var k in Keys.ParseChord(spec)) Send(Key(k.Vk, false, k.Extended)); }
     public static void KeyUp(string spec) { foreach (var k in Keys.ParseChord(spec).AsEnumerable().Reverse()) Send(Key(k.Vk, true, k.Extended)); }
 
     /// <summary>Releases every modifier, in case an interrupted action left one down.</summary>
