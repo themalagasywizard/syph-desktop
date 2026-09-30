@@ -248,6 +248,15 @@ app.whenReady().then(async () => {
   if (launch.demo) {
     bridge.policy.onChange = null
   }
+  if (automation.email && automation.password) {
+    // CI only: sign in before the window exists, so the renderer's one-time
+    // session restore always finds the cookie (it used to race this login).
+    for (let i = 0; i < 10; i++) {
+      const res = await api.request('POST', '/api/v1/auth/login', { email: automation.email, password: automation.password })
+      if (res.ok) { bridge.policy.setEnabled(true); break }
+      await new Promise((r) => setTimeout(r, 3000))
+    }
+  }
   createMain()
   tray = new Tray(nativeImage.createFromPath(iconPath()).resize({ width: 16, height: 16 }))
   tray.on('click', () => showMain())
@@ -256,14 +265,6 @@ app.whenReady().then(async () => {
   globalShortcut.register('Alt+Space', toggleCommandBar)
   globalShortcut.register('Control+Alt+.', () => bridge.emergencyStop())
 
-  if (automation.email && automation.password) {
-    // CI only: sign in, then the renderer restores the session like a normal launch.
-    for (let i = 0; i < 10; i++) {
-      const res = await api.request('POST', '/api/v1/auth/login', { email: automation.email, password: automation.password })
-      if (res.ok) { bridge.policy.setEnabled(true); break }
-      await new Promise((r) => setTimeout(r, 3000))
-    }
-  }
   if (launch.demo && launch.demoConsent) {
     setTimeout(() => {
       showOverlay('Atlas', 'Reading the shipping sheet in Excel', 'hsl(40 100% 77%)')
