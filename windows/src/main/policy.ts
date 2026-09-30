@@ -8,6 +8,7 @@ import { SCOPES, type PolicyState, type Scope, type ScopeMode } from '../shared/
 export const DEFAULT_MODES: Record<Scope, ScopeMode> = {
   observe: 'allow', screen: 'allow', apps: 'allow', files_read: 'allow', clipboard: 'allow',
   control: 'ask', files_write: 'ask', shell: 'ask',
+  browser: 'ask', office: 'ask', files_outside: 'ask',
 }
 
 export function scopeFor(operation: string): Scope | null {
@@ -17,13 +18,21 @@ export function scopeFor(operation: string): Scope | null {
     case 'click': case 'click_text': case 'press': case 'type_text': case 'press_keys': case 'scroll':
     case 'set_value': case 'drag': case 'move': case 'window': return 'control'
     case 'open_app': case 'quit_app': case 'open_url': return 'apps'
-    case 'list_files': case 'read_file': return 'files_read'
+    case 'list_files': case 'read_file': case 'find_files': return 'files_read'
+    case 'browser_open': case 'browser_snapshot': case 'browser_read': case 'browser_click': case 'browser_type':
+    case 'browser_select': case 'browser_check': case 'browser_keys': case 'browser_scroll': case 'browser_back':
+    case 'browser_tab': case 'browser_wait': return 'browser'
+    case 'excel_list': case 'excel_read': case 'excel_write': case 'excel_save': case 'word_read': case 'word_write':
+    case 'word_save': case 'outlook_list': case 'outlook_read': case 'outlook_search': case 'outlook_draft': return 'office'
     case 'write_file': case 'trash_file': return 'files_write'
     case 'run_shell': return 'shell'
     case 'clipboard_read': case 'clipboard_write': return 'clipboard'
     default: return null
   }
 }
+
+/** Reading operations that may reach outside the shared folders, with the argument holding the path. */
+const OUTSIDE_READS: Record<string, string> = { read_file: 'path', list_files: 'path', excel_read: 'path', word_read: 'path' }
 
 /** The owner's local choices, persisted on this PC only. */
 export class Policy {
@@ -59,6 +68,34 @@ export class Policy {
       fs.writeFileSync(this.file, JSON.stringify(this.state, null, 2))
     } catch { /* best effort */ }
     this.onChange?.()
+  }
+
+  /** The scope a command needs: reading outside the shared folders is its own, stricter scope. */
+  scopeForCommand(operation: string, args: Record<string, unknown>): Scope | null {
+    const base = scopeFor(operation)
+    if (operation === 'find_files' && args.everywhere === true) return 'files_outside'
+    const key = OUTSIDE_READS[operation]
+    const raw = key ? args[key] : undefined
+    if (typeof raw === 'string' && raw.trim() && !this.resolveShared(raw) && !this.isForbidden(raw)) return 'files_outside'
+    return base
+  }
+
+  /** Places Syph never reads, whatever the owner allows: its own session, and credential and browser-secret stores. */
+  isForbidden(raw: string): boolean {
+    const p = path.resolve(raw.replace(/^~(?=$|[\\/])/, os.homedir())).toLowerCase()
+    const own = app.getPath('userData').toLowerCase()
+    const blocked = [own, '\\microsoft\\credentials', '\\microsoft\\protect', '\\microsoft\\crypto', '\\microsoft\\vault',
+      'login data', 'cookies', 'web data', 'local state', '.kdbx', '\\.ssh', '\\windows\\system32\\config']
+    return blocked.some((b) => p.includes(b))
+  }
+
+  /** A readable path: inside the shared folders, or anywhere not forbidden when outside reads were allowed. */
+  resolveReadable(raw: unknown, outsideAllowed: boolean): string | null {
+    const shared = this.resolveShared(raw)
+    if (shared) return shared
+    if (!outsideAllowed || typeof raw !== 'string' || this.isForbidden(raw)) return null
+    const p = path.resolve(raw.trim().replace(/^~(?=$|[\\/])/, os.homedir()))
+    try { return fs.realpathSync.native(p) } catch { return null }
   }
 
   mode(scope: Scope): ScopeMode { return this.state.modes[scope] ?? DEFAULT_MODES[scope] }

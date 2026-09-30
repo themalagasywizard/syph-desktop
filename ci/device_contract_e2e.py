@@ -46,8 +46,11 @@ WINDOWS_CASES = [
     ("write_file", {"path": "e2e/hello.txt", "content": MARKER}, True),
     ("read_file", {"path": "e2e/hello.txt"}, True),
     ("list_files", {"path": "e2e"}, True),
+    ("find_files", {"query": "hello"}, True, lambda d: any(f.get("name") == "hello.txt" for f in d.get("files", []))),
     ("read_file", {"path": "C:\\Windows\\win.ini"}, False),  # outside shared folders: must be refused
     ("run_shell", {"command": "Get-Content e2e\\hello.txt; 'shell-ok'"}, True),
+    ("run_shell", {"command": "$syphAnswer = 41", "session": True}, True, lambda d: True),
+    ("run_shell", {"command": "$syphAnswer + 1", "session": True}, True, lambda d: d.get("stdout", "").strip() == "42"),
     ("applescript", {"script": "return 5"}, False),  # Mac only: refused with a pointer to PowerShell
     ("clipboard_write", {"text": MARKER}, True),
     ("clipboard_read", {}, True),
@@ -67,6 +70,11 @@ WINDOWS_CASES = [
     ("quit_app", {"app": "Notepad"}, None),  # classic Notepad may ask to save
     ("press", {"title": "Don't Save"}, None),
     ("open_url", {"url": "file:///C:/Windows/win.ini"}, False),  # only web-style links
+    # Syph's own browser (Edge profile over the DevTools protocol)
+    ("browser_open", {"url": "https://example.com"}, True, lambda d: "Example" in d.get("title", "") and bool(d.get("_image"))),
+    ("browser_read", {}, True, lambda d: "Example Domain" in d.get("content", "")),
+    ("browser_snapshot", {}, True, lambda d: any(e.get("role") == "link" for e in d.get("elements", []))),
+    ("excel_list", {}, None),  # hosted runners have no Office; reported either way
     ("trash_file", {"path": "e2e/hello.txt"}, True),
 ]
 
@@ -82,8 +90,9 @@ def _text_area(results_by_op):
 
 lock = threading.Lock()
 queue = [
-    {"id": str(uuid.uuid4()), "operation": op, "arguments": args, "expect": expect}
-    for op, args, expect in CASES
+    {"id": str(uuid.uuid4()), "operation": case[0], "arguments": case[1], "expect": case[2],
+     "check": case[3] if len(case) > 3 else None}
+    for case in CASES
 ]
 results: dict[str, dict] = {}
 devices: dict[str, dict] = {}
@@ -228,7 +237,10 @@ def main() -> int:
             "snapshot": lambda: len(data.get("elements") or []) > 0 and len(data.get("_image") or "") > 1000,
             "act": lambda: len((data.get("screen_after") or {}).get("elements") or []) > 0 and bool(data.get("_image")),
         }
-        if ok and cmd["operation"] in checks and not checks[cmd["operation"]]():
+        if ok and cmd["check"] is not None:
+            if not cmd["check"](data):
+                verdict = "WRONG DATA"
+        elif ok and cmd["operation"] in checks and not checks[cmd["operation"]]():
             verdict = "WRONG DATA"
         if verdict != "ok":
             failures += 1

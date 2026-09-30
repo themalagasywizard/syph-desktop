@@ -1,10 +1,13 @@
 import { clipboard, shell } from 'electron'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { DeviceCommand } from '../shared/types'
+import type { Scope } from '../shared/types'
+import { SyphBrowser } from './browser'
 import type { Policy } from './policy'
 import { host, type HostCallError } from './host'
-import { runCommand, runScript, type ScriptResult } from './powershell'
+import { runCommand, runScript, ShellSession, type ScriptResult } from './powershell'
 
 export type ExecutionResult = ScriptResult
 
@@ -22,7 +25,12 @@ function num(command: DeviceCommand, key: string): number | undefined {
 }
 
 /** Operations that only exist with the native helper. */
-export const HOST_OPERATIONS = ['snapshot', 'act', 'set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets'] as const
+export const HOST_OPERATIONS = ['snapshot', 'act', 'set_value', 'drag', 'move', 'read_text', 'list_windows', 'window', 'list_apps', 'element_targets',
+  'find_files', 'excel_list', 'excel_read', 'excel_write', 'excel_save', 'word_read', 'word_write', 'word_save',
+  'outlook_list', 'outlook_read', 'outlook_search', 'outlook_draft'] as const
+/** Operations that need only Electron (no native helper). */
+export const APP_OPERATIONS = ['browser_open', 'browser_snapshot', 'browser_read', 'browser_click', 'browser_type', 'browser_select',
+  'browser_check', 'browser_keys', 'browser_scroll', 'browser_back', 'browser_tab', 'browser_wait', 'shell_session'] as const
 
 /** Operations that change the screen; with observe they come back with a fresh snapshot. */
 const ACTING = new Set(['click', 'click_text', 'press', 'type_text', 'press_keys', 'scroll', 'set_value', 'drag', 'move', 'window', 'act', 'open_app', 'quit_app', 'open_url'])
@@ -55,11 +63,16 @@ function describe(e: any): string {
  * the original operations when the helper is unavailable.
  */
 export class Executor {
-  constructor(private policy: Policy) {}
+  private browser: SyphBrowser
+  private shell = new ShellSession()
+
+  constructor(private policy: Policy) {
+    this.browser = new SyphBrowser(() => this.policy.state.sharedFolders.find((f) => fs.existsSync(f)) ?? null)
+  }
 
   /** Operations beyond the original set that this PC can run right now; reported to the server. */
   capabilities(): string[] {
-    return host.available ? [...HOST_OPERATIONS] : []
+    return [...(host.available ? HOST_OPERATIONS : []), ...APP_OPERATIONS]
   }
 
   /** Calls the native helper and shapes its answer (or error) as a device result. */
@@ -77,7 +90,8 @@ export class Executor {
     return fail(`${op} needs the Syph helper, which isn't running on this PC. Reinstall Syph or use the other computer operations.`, { code: 'unavailable' })
   }
 
-  async run(command: DeviceCommand): Promise<ExecutionResult> {
+  async run(command: DeviceCommand, scope: Scope | null = null): Promise<ExecutionResult> {
+    this.outsideAllowed = scope === 'files_outside'
     const result = await this.perform(command)
     if (command.arguments.observe === true && ACTING.has(command.operation) && host.available) {
       return await this.withScreen(result)
@@ -98,11 +112,25 @@ export class Executor {
     }
   }
 
+  /** True while running a command the owner allowed to read outside the shared folders. */
+  private outsideAllowed = false
+
+  private readable(raw: string): string | null { return this.policy.resolveReadable(raw, this.outsideAllowed) }
+
   private async perform(command: DeviceCommand): Promise<ExecutionResult> {
     const a = command.arguments
     const useHost = host.available
+    if (command.operation.startsWith('browser_')) return await this.browser.run(command.operation, a)
+    if (/^(excel|word|outlook)_/.test(command.operation)) return await this.office(command)
     try {
       switch (command.operation) {
+        case 'find_files': {
+          const query = str(command, 'query') ?? str(command, 'text')
+          if (!query) return fail('find_files needs a query.')
+          if (!useHost) return this.needsHost('find_files')
+          const roots = a.everywhere === true && this.outsideAllowed ? [process.env.USERPROFILE ?? os.homedir()] : this.policy.state.sharedFolders
+          return await this.hostResult('files.find', { query, roots, limit: num(command, 'limit') ?? 50 }, 30_000)
+        }
         case 'snapshot': {
           if (!useHost) return this.needsHost('snapshot')
           try {
@@ -304,6 +332,29 @@ export class Executor {
     }
   }
 
+  /** Excel, Word and Outlook through the helper. Paths must be readable (open) or shared (save, attach). */
+  private async office(command: DeviceCommand): Promise<ExecutionResult> {
+    if (!host.available) return this.needsHost(command.operation)
+    const a = { ...command.arguments }
+    if (typeof a.path === 'string' && a.path) {
+      const writes = /_(write|save)$/.test(command.operation)
+      const resolved = writes ? this.policy.resolveShared(a.path) : this.readable(a.path)
+      if (!resolved) return fail(this.outside(a.path))
+      a.path = resolved
+    }
+    if (typeof a.save_as === 'string' && a.save_as) {
+      const target = this.policy.resolveShared(a.save_as)
+      if (!target) return fail(`Saving is limited to the shared folders; ${this.outside(a.save_as)}`)
+      a.save_as = target
+    }
+    if (Array.isArray(a.attachments)) {
+      const files = (a.attachments as unknown[]).map((f) => this.policy.resolveShared(f))
+      if (files.some((f) => !f)) return fail('Attachments must be files in the shared folders.')
+      a.attachments = files
+    }
+    return await this.hostResult(command.operation.replace('_', '.'), a, 120_000)
+  }
+
   /** Host methods that already answer in {ok, summary, data} form. */
   private async hostResult(method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<ExecutionResult> {
     try {
@@ -372,7 +423,7 @@ export class Executor {
       const entries = this.policy.state.sharedFolders.map((f) => ({ name: path.basename(f), path: f, kind: 'folder' }))
       return { ok: true, summary: `${entries.length} shared folder${entries.length === 1 ? '' : 's'}.`, data: { entries } }
     }
-    const dir = this.policy.resolveShared(raw)
+    const dir = this.readable(raw)
     if (!dir) return fail(this.outside(raw))
     const entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.name.startsWith('.')).slice(0, 300).map((e) => {
       const full = path.join(dir, e.name)
@@ -386,7 +437,7 @@ export class Executor {
   private readFile(command: DeviceCommand): ExecutionResult {
     const raw = str(command, 'path')
     if (!raw) return fail('read_file needs a path.')
-    const file = this.policy.resolveShared(raw)
+    const file = this.readable(raw)
     if (!file) return fail(this.outside(raw))
     const data = fs.readFileSync(file)
     const slice = data.subarray(0, 400_000)
@@ -423,7 +474,7 @@ export class Executor {
     const line = str(command, 'command')
     if (!line) return fail('run_shell needs a command.')
     const cwd = this.policy.state.sharedFolders.find((f) => fs.existsSync(f)) ?? process.env.USERPROFILE ?? 'C:\\'
-    const out = await runCommand(line, cwd)
+    const out = command.arguments.session === true ? await this.shell.run(line, cwd) : await runCommand(line, cwd)
     const data = { stdout: out.stdout, stderr: out.stderr, exit_code: out.status, shell: 'powershell' }
     if (out.timedOut) return fail('Command timed out.', data)
     if (out.status !== 0) {

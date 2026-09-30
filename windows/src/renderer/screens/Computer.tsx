@@ -1,6 +1,6 @@
 import {
   ClipboardList, Eye, FolderOpen, FolderPlus, Laptop, LayoutGrid, Link2Off, MinusCircle, Monitor, MousePointerClick,
-  Power, ScanText, ShieldCheck, Terminal, FileEdit, Folder, Keyboard, type LucideIcon,
+  Power, ScanText, ShieldCheck, Terminal, FileEdit, Folder, Keyboard, Globe, FileSpreadsheet, FolderSearch, type LucideIcon,
 } from 'lucide-react'
 import type { LocalAction, Scope, ScopeMode } from '../../shared/types'
 import { AgentOrb } from '../components/Orb'
@@ -11,16 +11,22 @@ import { setTool, useStore } from '../lib/store'
 
 export const SCOPE_META: Record<Scope, { title: string; detail: string; icon: LucideIcon; risk: number }> = {
   observe: { title: 'See what’s open', detail: 'Foreground app, window titles, running apps.', icon: Eye, risk: 0 },
-  screen: { title: 'Read the screen', detail: 'On-device Windows OCR of the screen and UI Automation of window controls. Nothing leaves the PC but the text.', icon: ScanText, risk: 1 },
+  screen: { title: 'See the screen', detail: 'Screenshots of the screen with its controls numbered, sent to your AI model so it can act. Password fields are blacked out before anything leaves this PC.', icon: ScanText, risk: 1 },
   control: { title: 'Click and type', detail: 'Move the pointer, click, type and press shortcuts while you watch.', icon: MousePointerClick, risk: 2 },
   apps: { title: 'Open apps and links', detail: 'Launch, focus and close apps; open links in your browser.', icon: LayoutGrid, risk: 1 },
+  browser: { title: 'Use Syph’s browser', detail: 'A separate Edge profile the employee reads and fills in directly. Sign in to sites there once; your own browser is untouched.', icon: Globe, risk: 2 },
+  office: { title: 'Excel, Word and Outlook', detail: 'Read and write open workbooks and documents, read mail, and draft emails for you to send. Never sends by itself.', icon: FileSpreadsheet, risk: 2 },
   clipboard: { title: 'Clipboard', detail: 'Read and write the clipboard.', icon: ClipboardList, risk: 0 },
-  files_read: { title: 'Read shared files', detail: 'List and read files, only inside the folders you share below.', icon: Folder, risk: 1 },
+  files_read: { title: 'Read shared files', detail: 'List, search and read files, only inside the folders you share below.', icon: Folder, risk: 1 },
+  files_outside: { title: 'Read other files', detail: 'Search and read files elsewhere in your user folder. Syph’s session, passwords and browser secrets stay off-limits.', icon: FolderSearch, risk: 2 },
   files_write: { title: 'Change shared files', detail: 'Create, overwrite and recycle files inside shared folders.', icon: FileEdit, risk: 2 },
   shell: { title: 'Run PowerShell commands', detail: 'Run PowerShell as you. The most powerful scope — keep it on Ask.', icon: Terminal, risk: 3 },
 }
-const ORDER: Scope[] = ['observe', 'screen', 'control', 'apps', 'clipboard', 'files_read', 'files_write', 'shell']
-const DEFAULTS: Record<Scope, ScopeMode> = { observe: 'allow', screen: 'allow', apps: 'allow', files_read: 'allow', clipboard: 'allow', control: 'ask', files_write: 'ask', shell: 'ask' }
+const ORDER: Scope[] = ['observe', 'screen', 'control', 'apps', 'browser', 'office', 'clipboard', 'files_read', 'files_outside', 'files_write', 'shell']
+const DEFAULTS: Record<Scope, ScopeMode> = {
+  observe: 'allow', screen: 'allow', apps: 'allow', files_read: 'allow', clipboard: 'allow',
+  control: 'ask', files_write: 'ask', shell: 'ask', browser: 'ask', office: 'ask', files_outside: 'ask',
+}
 
 export function ComputerScreen() {
   return (

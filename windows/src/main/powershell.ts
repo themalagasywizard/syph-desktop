@@ -54,3 +54,64 @@ export function runCommand(command: string, cwd: string, timeoutMs = 120_000): P
     child.on('close', (code) => { clearTimeout(timer); resolve({ stdout, stderr, status: code ?? -1, timedOut }) })
   })
 }
+
+const END = /<<<SYPH-END (\S*)>>>\r?$/m
+
+/**
+ * One long-lived PowerShell where variables, the current folder and imported
+ * modules carry over between commands (run_shell with session: true). Each
+ * command is sent base64-encoded on one line and dot-sourced, so multi-line
+ * scripts work; a sentinel line marks its end.
+ */
+export class ShellSession {
+  private child: ReturnType<typeof spawn> | null = null
+  private out = ''
+  private waiter: ((text: string, code: string) => void) | null = null
+  private queue: Promise<unknown> = Promise.resolve()
+
+  private start(cwd: string) {
+    const child = spawn(POWERSHELL, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'], { cwd, windowsHide: true })
+    child.stdout!.setEncoding('utf8').on('data', (d: string) => {
+      this.out += d
+      const m = this.out.match(END)
+      if (m && this.waiter) {
+        const text = this.out.slice(0, m.index)
+        this.out = this.out.slice((m.index ?? 0) + m[0].length)
+        const w = this.waiter
+        this.waiter = null
+        w(text, m[1])
+      }
+    })
+    child.stderr!.setEncoding('utf8').on('data', (d: string) => { this.out += d })
+    child.on('exit', () => { if (this.child === child) this.child = null })
+    child.stdin!.write('[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ProgressPreference = "SilentlyContinue"\n')
+    this.child = child
+  }
+
+  run(command: string, cwd: string, timeoutMs = 120_000): Promise<ShellOutput> {
+    const next = this.queue.then(() => new Promise<ShellOutput>((resolve) => {
+      if (!this.child) this.start(cwd)
+      const child = this.child!
+      const timer = setTimeout(() => {
+        this.waiter = null
+        child.kill()
+        this.child = null
+        resolve({ stdout: this.out.slice(-60_000), stderr: 'The shell session was restarted after the command timed out.', status: -1, timedOut: true })
+        this.out = ''
+      }, timeoutMs)
+      this.waiter = (text, code) => {
+        clearTimeout(timer)
+        const status = code === 'False' ? 1 : /^-?\d+$/.test(code) ? Number(code) : 0
+        resolve({ stdout: text.slice(-60_000), stderr: '', status, timedOut: false })
+      }
+      const b64 = Buffer.from(command, 'utf8').toString('base64')
+      child.stdin!.write(
+        `try { . ([ScriptBlock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))) 2>&1 | Out-String -Width 220 } ` +
+        `catch { $_ | Out-String -Width 220 }; $__ok = $?; "<<<SYPH-END $(if ($LASTEXITCODE) { $LASTEXITCODE } else { $__ok })>>>"\n`)
+    }))
+    this.queue = next.catch(() => {})
+    return next
+  }
+
+  stop() { this.child?.kill(); this.child = null }
+}

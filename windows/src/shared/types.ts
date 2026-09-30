@@ -66,7 +66,7 @@ export interface DeviceCommand {
 // ---- Computer control (local) ----
 
 export type ScopeMode = 'off' | 'ask' | 'allow'
-export const SCOPES = ['observe', 'screen', 'control', 'apps', 'clipboard', 'files_read', 'files_write', 'shell'] as const
+export const SCOPES = ['observe', 'screen', 'control', 'apps', 'browser', 'office', 'clipboard', 'files_read', 'files_outside', 'files_write', 'shell'] as const
 export type Scope = (typeof SCOPES)[number]
 
 export interface PolicyState {

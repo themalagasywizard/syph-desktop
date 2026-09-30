@@ -14,7 +14,7 @@ function mockBridge(): SyphBridge {
   const emit = (channel: string, payload: unknown) => listeners.get(channel)?.forEach((fn) => fn(payload))
   const modes: Record<Scope, ScopeMode> = {
     observe: 'allow', screen: 'allow', apps: 'allow', files_read: 'allow', clipboard: 'allow',
-    control: 'ask', files_write: 'ask', shell: 'ask',
+    control: 'ask', files_write: 'ask', shell: 'ask', browser: 'ask', office: 'ask', files_outside: 'ask',
   }
   const state: BridgeState = {
     deviceId: 'dev-1', link: 'online', current: null, log: demoLog, devices: demoDevices, hostName: 'STUDIO-PC',

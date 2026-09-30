@@ -9,7 +9,7 @@ import type {
 import { api } from './api'
 import { Executor, type ExecutionResult } from './executor'
 import { host as nativeHost } from './host'
-import { Policy, scopeFor } from './policy'
+import { Policy } from './policy'
 
 export interface BridgeHost {
   broadcast(state: BridgeState): void
@@ -22,6 +22,7 @@ export interface BridgeHost {
 const SCOPE_TITLES: Record<Scope, string> = {
   observe: 'See what’s open', screen: 'Read the screen', control: 'Click and type', apps: 'Open apps and links',
   clipboard: 'Clipboard', files_read: 'Read shared files', files_write: 'Change shared files', shell: 'Run PowerShell commands',
+  browser: 'Use Syph’s browser', office: 'Work in Excel, Word and Outlook', files_outside: 'Read files outside shared folders',
 }
 
 /** Stable hue per employee id — the same hash the Mac app and renderer use. */
@@ -54,6 +55,16 @@ export function headline(c: DeviceCommand): string {
     case 'window': return `${String(a.action ?? 'focus').replace(/_/g, ' ').replace(/^\w/, (x) => x.toUpperCase())} ${a.window ?? a.app ?? 'a window'}`
     case 'list_windows': return 'See what’s open'
     case 'list_apps': return 'See installed apps'
+    case 'browser_open': { try { return `Open ${new URL(/^[a-z]+:/i.test(String(a.url)) ? String(a.url) : `https://${a.url}`).hostname} in Syph’s browser` } catch { return 'Open a web page' } }
+    case 'browser_type': return 'Type into a web page'
+    case 'browser_click': return 'Click on a web page'
+    case 'excel_write': return 'Change a spreadsheet in Excel'
+    case 'word_write': return 'Change a document in Word'
+    case 'excel_save': case 'word_save': return a.save_as ? `Save as ${base(a.save_as)}` : 'Save the open file'
+    case 'outlook_draft': return `Draft an email${a.to ? ` to ${a.to}` : ''} in Outlook`
+    case 'outlook_list': case 'outlook_read': case 'outlook_search': return 'Read your Outlook mail'
+    case 'excel_read': case 'word_read': return a.path ? `Read ${base(a.path)}` : 'Read the open Office file'
+    case 'find_files': return a.everywhere ? `Search all your files for ‘${a.query}’` : `Search shared folders for ‘${a.query}’`
     default: return c.operation.replace(/_/g, ' ').replace(/^\w/, (s) => s.toUpperCase())
   }
 }
@@ -213,7 +224,7 @@ export class DeviceBridge {
 
   private async handle(command: DeviceCommand) {
     this.abortCurrent = false
-    const scope = scopeFor(command.operation)
+    const scope = this.policy.scopeForCommand(command.operation, command.arguments)
     let action: LocalAction = {
       id: command.id, employee: command.employeeName, employeeId: command.employeeId, operation: command.operation,
       scope, status: 'running', summary: headline(command), detail: detail(command), startedAt: Date.now(),
@@ -241,7 +252,7 @@ export class DeviceBridge {
     if (visible) this.host.showOverlay(command.employeeName, action.summary, tint)
     if (command.operation === 'notify') this.host.showOverlay(command.employeeName, String(command.arguments.text ?? 'Heads up'), 'hsl(158 58% 68%)')
     void this.report(command.id, 'running', action.summary, {})
-    const result = await this.executor.run(command)
+    const result = await this.executor.run(command, scope)
     if (visible || command.operation === 'notify') this.host.hideOverlay(command.operation === 'notify' ? 5000 : 1400)
     if (this.abortCurrent) return this.finish(action, 'failed', { ok: false, summary: 'Stopped by the owner.' })
     action = { ...action }

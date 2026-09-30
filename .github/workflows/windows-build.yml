@@ -66,7 +66,8 @@ jobs:
           # Allow every scope so the harness exercises each operation without a consent click.
           $policy = @{ controlEnabled = $true; sharedFolders = @("$env:USERPROFILE\Documents\Syph")
                        modes = @{ observe = 'allow'; screen = 'allow'; control = 'allow'; apps = 'allow'; clipboard = 'allow'
-                                  files_read = 'allow'; files_write = 'allow'; shell = 'allow' } } | ConvertTo-Json -Depth 4
+                                  files_read = 'allow'; files_write = 'allow'; shell = 'allow'
+                                  browser = 'allow'; office = 'allow'; files_outside = 'off' } } | ConvertTo-Json -Depth 4
           foreach ($name in 'Syph', 'syph-windows') {
             New-Item -ItemType Directory -Force "$env:APPDATA\$name" | Out-Null
             Set-Content -Path "$env:APPDATA\$name\computer.json" -Value $policy -Encoding utf8

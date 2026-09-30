@@ -107,6 +107,9 @@ public static class Program
             case "capture": return Capture(a);
             case "ocr": return ReadScreen(a);
             case "snapshot": return Snapshot.Take(a);
+            case "files.find": return Search.Find(a);
+            case var m when m.StartsWith("excel.") || m.StartsWith("word.") || m.StartsWith("outlook."):
+                return Office.Dispatch(m, a);
             case "ui.elements":
             {
                 var fg = a.Has("handle") || a.Has("window") || a.Has("app") ? WindowManager.Find(a) : Native.GetForegroundWindow();
