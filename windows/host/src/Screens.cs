@@ -140,31 +140,43 @@ public static class Screens
         return Convert.ToBase64String(ms.ToArray());
     }
 
-    /// <summary>A cheap perceptual fingerprint (16x16 grey) used to tell whether the screen changed.</summary>
+    public const int GridW = 64, GridH = 48;
+
+    /// <summary>A cheap perceptual fingerprint: the screen as a 64x48 grid of grey levels.</summary>
     public static byte[] Fingerprint(Bitmap bmp)
     {
-        using var tiny = new Bitmap(16, 16, PixelFormat.Format24bppRgb);
+        using var tiny = new Bitmap(GridW, GridH, PixelFormat.Format24bppRgb);
         using (var g = Graphics.FromImage(tiny))
         {
-            g.InterpolationMode = InterpolationMode.Bilinear;
-            g.DrawImage(bmp, 0, 0, 16, 16);
+            g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+            g.DrawImage(bmp, 0, 0, GridW, GridH);
         }
-        var bytes = new byte[256];
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
-            {
-                var c = tiny.GetPixel(x, y);
-                bytes[y * 16 + x] = (byte)((c.R * 30 + c.G * 59 + c.B * 11) / 100);
-            }
-        return bytes;
+        var data = tiny.LockBits(new Rectangle(0, 0, GridW, GridH), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        try
+        {
+            var raw = new byte[data.Stride * GridH];
+            Marshal.Copy(data.Scan0, raw, 0, raw.Length);
+            var grey = new byte[GridW * GridH];
+            for (int y = 0; y < GridH; y++)
+                for (int x = 0; x < GridW; x++)
+                {
+                    int i = y * data.Stride + x * 3; // B, G, R
+                    grey[y * GridW + x] = (byte)((raw[i + 2] * 30 + raw[i + 1] * 59 + raw[i] * 11) / 100);
+                }
+            return grey;
+        }
+        finally { tiny.UnlockBits(data); }
     }
 
-    /// <summary>Mean absolute difference between two fingerprints, 0..255.</summary>
-    public static double Difference(byte[] a, byte[] b)
+    /// <summary>How many grid cells changed noticeably. A blinking caret or the clock moves 1-2;
+    /// typing a word, opening a menu or loading a page moves more.</summary>
+    public static int ChangedCells(byte[] a, byte[] b)
     {
-        if (a.Length != b.Length) return 255;
-        double sum = 0;
-        for (int i = 0; i < a.Length; i++) sum += Math.Abs(a[i] - b[i]);
-        return sum / a.Length;
+        if (a.Length != b.Length) return a.Length;
+        int n = 0;
+        for (int i = 0; i < a.Length; i++) if (Math.Abs(a[i] - b[i]) > 6) n++;
+        return n;
     }
+
+    public static bool Changed(byte[] a, byte[] b) => ChangedCells(a, b) >= 3;
 }

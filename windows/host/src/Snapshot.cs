@@ -43,7 +43,7 @@ public static class Snapshot
 
         var redacted = Marks.Redact(full, area.Left, area.Top, elements);
         var fingerprint = Screens.Fingerprint(full);
-        var changed = _lastFingerprint is null ? (bool?)null : Screens.Difference(_lastFingerprint, fingerprint) > 1.5;
+        var changed = _lastFingerprint is null ? (bool?)null : Screens.Changed(_lastFingerprint, fingerprint);
         _lastFingerprint = fingerprint;
 
         List<OcrLine>? lines = null;
