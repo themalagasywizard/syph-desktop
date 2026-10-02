@@ -66,38 +66,10 @@ private struct ModelSection: View {
 
     var body: some View {
         SettingsGroup(title: "AI model", symbol: "cpu") {
-            let current = store.llmProviders.first { $0.id == provider }
-            HStack(spacing: 12) {
-                Picker("Provider", selection: $provider) {
-                    ForEach(store.llmProviders) { Text($0.name).tag($0.id) }
-                }
-                Picker("Model", selection: $model) {
-                    ForEach(current?.models ?? []) { Text($0.name).tag($0.id) }
-                    if let custom = current, custom.allowCustomModel, !(custom.models.contains { $0.id == model }), !model.isEmpty {
-                        Text(model).tag(model)
-                    }
-                }
-            }
-            SyphTextField(title: store.llmSettings?.keyConfigured == true ? "Key saved (\(store.llmSettings?.keyHint ?? "")) — paste to replace"
-                                                                        : (current?.keyLabel ?? "API key"),
-                          text: $apiKey, secure: true, symbol: "key")
-            HStack {
-                if let status {
-                    Label(status, systemImage: ok ? "checkmark.circle" : "exclamationmark.triangle")
-                        .font(Typo.caption).foregroundStyle(ok ? Palette.mint : Palette.coral)
-                }
-                Spacer()
-                if busy { ProgressView().controlSize(.small) }
-                Button("Test") { run { let r = try await store.testModel(); ok = r.ok; status = r.message } }
-                    .buttonStyle(GhostButtonStyle(compact: true))
-                Button("Save") {
-                    run {
-                        try await store.saveModel(provider: provider, model: model, apiKey: apiKey)
-                        apiKey = ""; ok = true; status = "Saved."
-                    }
-                }
-                .buttonStyle(SignalButtonStyle(compact: true))
-                .disabled(provider.isEmpty || model.isEmpty)
+            if let settings = store.llmSettings, settings.isManaged {
+                managedBody(settings)
+            } else {
+                editableBody
             }
         }
         .task {
@@ -110,6 +82,64 @@ private struct ModelSection: View {
                !(store.llmProviders.first { $0.id == value }?.models.contains { $0.id == model } ?? false) {
                 model = first.id
             }
+        }
+    }
+
+    private func managedBody(_ settings: LlmSettings) -> some View {
+        let name = store.llmProviders.first { $0.id == settings.provider }?.models.first { $0.id == settings.model }?.name ?? settings.model
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("AI model managed by Syph").font(Typo.callout).foregroundStyle(Palette.textTertiary)
+            Text(name).font(Typo.callout).foregroundStyle(Palette.text).textSelection(.enabled)
+            HStack {
+                statusLabel
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
+                testButton
+            }
+        }
+    }
+
+    @ViewBuilder private var statusLabel: some View {
+        if let status {
+            Label(status, systemImage: ok ? "checkmark.circle" : "exclamationmark.triangle")
+                .font(Typo.caption).foregroundStyle(ok ? Palette.mint : Palette.coral)
+        }
+    }
+
+    private var testButton: some View {
+        Button("Test") { run { let r = try await store.testModel(); ok = r.ok; status = r.message } }
+            .buttonStyle(GhostButtonStyle(compact: true))
+    }
+
+    @ViewBuilder private var editableBody: some View {
+        let current = store.llmProviders.first { $0.id == provider }
+        HStack(spacing: 12) {
+            Picker("Provider", selection: $provider) {
+                ForEach(store.llmProviders) { Text($0.name).tag($0.id) }
+            }
+            Picker("Model", selection: $model) {
+                ForEach(current?.models ?? []) { Text($0.name).tag($0.id) }
+                if let custom = current, custom.allowCustomModel, !(custom.models.contains { $0.id == model }), !model.isEmpty {
+                    Text(model).tag(model)
+                }
+            }
+        }
+        SyphTextField(title: store.llmSettings?.keyConfigured == true ? "Key saved (\(store.llmSettings?.keyHint ?? "")) — paste to replace"
+                                                                    : (current?.keyLabel ?? "API key"),
+                      text: $apiKey, secure: true, symbol: "key")
+        HStack {
+            statusLabel
+            Spacer()
+            if busy { ProgressView().controlSize(.small) }
+            testButton
+            Button("Save") {
+                run {
+                    try await store.saveModel(provider: provider, model: model, apiKey: apiKey)
+                    apiKey = ""; ok = true; status = "Saved."
+                }
+            }
+            .buttonStyle(SignalButtonStyle(compact: true))
+            .disabled(provider.isEmpty || model.isEmpty)
         }
     }
 

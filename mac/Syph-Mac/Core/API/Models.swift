@@ -270,6 +270,10 @@ struct LlmSettings: Decodable, Hashable {
     let keyConfigured: Bool
     let keyHint: String
     let fallbackModels: [String]
+    /// Set by newer servers when Syph manages the model; absent on older ones.
+    let managed: Bool?
+
+    var isManaged: Bool { managed ?? false }
 }
 
 struct SettingsResult: Decodable {
