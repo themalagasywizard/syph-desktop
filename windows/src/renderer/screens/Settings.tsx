@@ -82,6 +82,27 @@ function Model() {
       </select>
     </label>
   )
+  const testButton = <button className="btn-ghost sm" onClick={() => void run(async () => { const r = await testModel(); setStatus({ ok: r.ok, text: r.message }) })}>Test</button>
+  const statusLine = status && (
+    <span className="t-caption" style={{ color: status.ok ? palette.mint : palette.coral, display: 'flex', gap: 5, alignItems: 'center' }}>
+      {status.ok ? <CheckCircle2 size={12} /> : <CircleAlert size={12} />}{status.text}
+    </span>
+  )
+  if (settings?.managed) {
+    const modelName = providers.find((p) => p.id === settings.provider)?.models.find((m) => m.id === settings.model)?.name ?? settings.model
+    return (
+      <Group title="AI model" icon={Cpu}>
+        <div className="t-callout c2">AI model managed by Syph</div>
+        <div className="t-callout">{modelName}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {statusLine}
+          <span style={{ flex: 1 }} />
+          {busy && <Spinner />}
+          {testButton}
+        </div>
+      </Group>
+    )
+  }
   return (
     <Group title="AI model" icon={Cpu}>
       <div style={{ display: 'flex', gap: 12 }}>
@@ -91,14 +112,10 @@ function Model() {
       <TextField value={key} onChange={setKey} secure icon={KeyRound}
         placeholder={settings?.keyConfigured ? `Key saved (${settings.keyHint}) — paste to replace` : current?.keyLabel ?? 'API key'} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {status && (
-          <span className="t-caption" style={{ color: status.ok ? palette.mint : palette.coral, display: 'flex', gap: 5, alignItems: 'center' }}>
-            {status.ok ? <CheckCircle2 size={12} /> : <CircleAlert size={12} />}{status.text}
-          </span>
-        )}
+        {statusLine}
         <span style={{ flex: 1 }} />
         {busy && <Spinner />}
-        <button className="btn-ghost sm" onClick={() => void run(async () => { const r = await testModel(); setStatus({ ok: r.ok, text: r.message }) })}>Test</button>
+        {testButton}
         <button className="btn-signal sm" disabled={!provider || !model} onClick={() => void run(async () => { await saveModel(provider, model, key); setKey(''); setStatus({ ok: true, text: 'Saved.' }) })}>Save</button>
       </div>
     </Group>

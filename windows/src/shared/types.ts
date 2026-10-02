@@ -46,7 +46,7 @@ export interface LibraryDocument {
 export interface DocumentListing { documents: LibraryDocument[]; folders: string[] }
 
 export interface LlmProvider { id: string; name: string; keyLabel: string; keyHint: string; allowCustomModel: boolean; models: { id: string; name: string }[] }
-export interface LlmSettings { provider: string; model: string; baseUrl: string; keyConfigured: boolean; keyHint: string; fallbackModels: string[] }
+export interface LlmSettings { provider: string; model: string; baseUrl: string; keyConfigured: boolean; keyHint: string; fallbackModels: string[]; managed?: boolean }
 
 export interface WorkspacePayload {
   user: SyphUser; employees: Employee[]; approvals: Approval[]; activity: Activity[]; jobs: WakeJob[]
